@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Go Battle LIVE">
+<meta name="theme-color" content="#0F0C0A">
+<title>ภาพออกอากาศ — Go Battle Live</title>
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Noto+Sans+JP:wght@700&display=swap" rel="stylesheet">
+<script src="/go-engine.js"></script>
+<style>
+/* ═══════════════════════════════════════════════════════════════
+ *  ภาพออกอากาศ 1080 × 1920 แนวตั้งสำหรับ TikTok
+ *  เขตปลอดภัย: เว้นบน 250px และล่าง 400px ไว้ให้ UI ของ TikTok
+ *  ใส่ใน OBS เป็น Browser Source ขนาด 1080×1920
+ * ═══════════════════════════════════════════════════════════════ */
+:root{
+  --sumi:#0F0C0A; --panel:#1C1714; --line:#3A302A;
+  --kaya:#E2B565; --shell:#F6F2E7; --shu:#C2372E; --matcha:#7E9468; --muted:#9A8E82;
+  --safe-top:250px; --safe-bot:400px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:#000;overflow:hidden}
+#stage{
+  position:absolute; top:50%; left:50%; transform-origin:center;
+  width:1080px; height:1920px; margin:-960px 0 0 -540px;
+  padding-top:var(--safe-top); padding-bottom:var(--safe-bot);
+  background:
+    radial-gradient(1200px 900px at 50% 42%, #241D18 0%, var(--sumi) 70%),
+    var(--sumi);
+  color:var(--shell); font-family:'IBM Plex Sans Thai',sans-serif;
+  display:flex; flex-direction:column;
+  padding-left:48px; padding-right:48px;
+}
+.dp{font-family:'Mitr',sans-serif;font-weight:500}
+.hidden{display:none !important}
+
+/* ── แถบหัว ── */
+.head{display:flex;align-items:center;gap:16px;margin-bottom:22px}
+.seal{width:64px;height:64px;border-radius:10px;background:var(--shu);color:#fff;
+  display:grid;place-items:center;font-family:'Mitr';font-size:34px;
+  box-shadow:inset 0 0 0 2px #8E251E}
+.title{font-family:'Mitr';font-size:34px;line-height:1.1}
+.sub{font-size:20px;color:var(--muted)}
+.roomtag{margin-left:auto;font-family:'Mitr';font-size:26px;color:var(--kaya);
+  border:2px solid var(--line);border-radius:12px;padding:8px 18px;letter-spacing:.12em}
+
+/* ── การ์ดผู้เล่น ── */
+.pcard{display:flex;align-items:center;gap:18px;background:var(--panel);
+  border:2px solid var(--line);border-left:8px solid transparent;
+  border-radius:18px;padding:18px 22px;transition:border-color .25s,background .25s}
+.pcard.turn{border-left-color:var(--shu);background:#261E1A}
+.stone{width:52px;height:52px;border-radius:50%;flex:none;box-shadow:0 3px 8px rgba(0,0,0,.6)}
+.stone.b{background:radial-gradient(circle at 32% 30%,#5B534C,#15120F)}
+.stone.w{background:radial-gradient(circle at 32% 30%,#FFFFFB,#CFC7B2)}
+.pname{font-family:'Mitr';font-size:36px;line-height:1.15}
+.prank{font-size:22px;color:var(--muted)}
+.pright{margin-left:auto;text-align:right}
+.clock{font-family:'Mitr';font-size:44px;font-variant-numeric:tabular-nums;line-height:1}
+.clock.warn{color:var(--shu)}
+.clock.pulse{animation:pulse .9s infinite}
+@keyframes pulse{50%{opacity:.4}}
+.cap{font-size:20px;color:var(--muted);margin-top:4px}
+
+/* ── แถบประเมินคะแนน ── */
+.bar{height:16px;border-radius:8px;overflow:hidden;background:#000;
+  border:2px solid var(--line);margin:16px 0;display:flex}
+.bar i{display:block;height:100%;transition:width .5s ease}
+.bar .b{background:linear-gradient(90deg,#3A332C,#15120F)}
+.bar .w{background:linear-gradient(90deg,#E8E2D0,#FFFDF4)}
+.barlabel{display:flex;justify-content:space-between;font-size:20px;color:var(--muted);margin-top:-6px}
+
+/* ── กระดาน ── */
+.boardbox{flex:1;display:grid;place-items:center;position:relative;margin:10px 0 18px}
+#board{width:min(960px, 100%);height:auto;aspect-ratio:1/1;border-radius:18px;box-shadow:0 14px 46px rgba(0,0,0,.65)}
+#board.wipe{animation:wipe .8s ease}
+#board.fadein{animation:fadein .45s ease}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+@keyframes wipe{
+  0%{clip-path:inset(0 100% 0 0);filter:brightness(1.6)}
+  60%{clip-path:inset(0 0 0 0);filter:brightness(1.15)}
+  100%{clip-path:inset(0 0 0 0);filter:none}
+}
+
+/* ── ข้อความ MC ── */
+.mc{background:var(--panel);border:2px solid var(--line);border-radius:18px;
+  padding:20px 24px;font-size:26px;line-height:1.5;min-height:96px;
+  display:flex;align-items:center;gap:16px}
+.mc .who{font-family:'Mitr';color:var(--shu);flex:none}
+
+/* ── จอว่าง ── */
+.idle{position:absolute;inset:0;display:grid;place-items:center;background:var(--sumi);z-index:20}
+.idle .in{text-align:center}
+.idle .big{font-family:'Mitr';font-size:56px;margin-bottom:12px}
+.idle .small{font-size:26px;color:var(--muted)}
+
+/* ── คัตซีนค่ายกล (เห็นเฉพาะบนไลฟ์) ── */
+#cut{position:absolute;inset:0;z-index:40;pointer-events:none;opacity:0}
+#cut.on{animation:cutscene 3s ease forwards}
+#cut .veil{position:absolute;inset:0;background:rgba(8,6,5,.62)}
+#cut .rays{position:absolute;inset:0;
+  background:repeating-linear-gradient(100deg,transparent 0 26px,rgba(194,55,46,.16) 26px 34px)}
+#cut .plate{position:absolute;left:0;right:0;top:44%;text-align:center}
+#cut .kanji{font-family:'Noto Sans JP',sans-serif;font-size:40px;color:var(--kaya);letter-spacing:.3em}
+#cut .name{font-family:'Mitr';font-size:76px;color:#fff;text-shadow:0 6px 26px rgba(194,55,46,.8)}
+#cut .tier{display:inline-block;margin-top:14px;font-family:'Mitr';font-size:30px;
+  background:var(--shu);color:#fff;padding:6px 26px;border-radius:999px;letter-spacing:.14em}
+#cut .brush{position:absolute;left:8%;right:8%;top:63%;height:10px;background:var(--shu);
+  border-radius:6px;transform-origin:left center;transform:scaleX(0);
+  animation:brush .5s .5s ease forwards}
+@keyframes brush{to{transform:scaleX(1)}}
+@keyframes cutscene{
+  0%{opacity:0} 12%{opacity:1} 88%{opacity:1} 100%{opacity:0}
+}
+
+/* ── หน้าจอเริ่มถ่ายทอด (จำเป็นสำหรับ iPhone: ปลดล็อกเสียง + กันจอดับ) ── */
+#boot{position:fixed;inset:0;z-index:90;background:#0F0C0A;color:#F6F2E7;
+  display:grid;place-items:center;text-align:center;padding:8vw;
+  font-family:'IBM Plex Sans Thai',sans-serif}
+#boot .b1{font-family:'Mitr';font-size:7vw;margin-bottom:2vh}
+#boot .b2{font-size:4vw;color:#9A8E82;line-height:1.7;margin-bottom:4vh}
+#boot button{font-family:'Mitr';font-size:5.5vw;background:#C2372E;color:#fff;border:none;
+  border-radius:16px;padding:4vw 10vw}
+</style>
+</head>
+<body>
+
+<div id="boot">
+  <div>
+    <div class="b1">พร้อมถ่ายทอดสด</div>
+    <div class="b2">
+      แตะปุ่มด้านล่างก่อนเริ่มแชร์หน้าจอ<br>
+      เพื่อเปิดเสียงและกันหน้าจอดับระหว่างถ่ายทอด
+    </div>
+    <button id="btnBoot">แตะเพื่อเริ่ม</button>
+  </div>
+</div>
+
+<div id="stage">
+
+  <div class="head">
+    <div class="seal">碁</div>
+    <div>
+      <div class="title">Go Battle Live</div>
+      <div class="sub">หมากล้อมออนไลน์ · กติกาสมาคมฯ</div>
+    </div>
+    <div class="roomtag" id="roomTag">——</div>
+  </div>
+
+  <div class="pcard" id="cardTop">
+    <span class="stone w" id="topStone"></span>
+    <div>
+      <div class="pname" id="topName">รอผู้เล่น</div>
+      <div class="prank" id="topRank">—</div>
+    </div>
+    <div class="pright">
+      <div class="clock" id="topClock">—</div>
+      <div class="cap" id="topCap">เชลย 0</div>
+    </div>
+  </div>
+
+  <div class="bar"><i class="b" id="barB" style="width:50%"></i><i class="w" id="barW" style="width:50%"></i></div>
+  <div class="barlabel"><span id="barBTxt">ดำ —</span><span id="barWTxt">— ขาว</span></div>
+
+  <div class="boardbox">
+    <canvas id="board" width="960" height="960"></canvas>
+  </div>
+
+  <div class="pcard" id="cardBot">
+    <span class="stone b" id="botStone"></span>
+    <div>
+      <div class="pname" id="botName">รอผู้เล่น</div>
+      <div class="prank" id="botRank">—</div>
+    </div>
+    <div class="pright">
+      <div class="clock" id="botClock">—</div>
+      <div class="cap" id="botCap">เชลย 0</div>
+    </div>
+  </div>
+
+  <div style="height:18px"></div>
+  <div class="mc" id="mcBox"><span class="who">MC</span><span id="mcText">รอเริ่มการถ่ายทอดสด…</span></div>
+
+  <!-- คัตซีนค่ายกล 3 วินาที -->
+  <div id="cut">
+    <div class="veil"></div><div class="rays"></div>
+    <div class="plate">
+      <div class="kanji" id="cutKanji">ウッテガエシ</div>
+      <div class="name"  id="cutName">ค่ายกลย้อนศร</div>
+      <div><span class="tier" id="cutTier">SSR</span></div>
+    </div>
+    <div class="brush"></div>
+  </div>
+
+  <!-- จอว่างตอนยังไม่มีห้องออกอากาศ -->
+  <div class="idle" id="idle">
+    <div class="in">
+      <div class="big" id="idleBig">รอเลือกห้องจากห้องคอนโทรล</div>
+      <div class="small" id="idleSmall">เปิด /director แล้วกด TAKE เพื่อส่งห้องขึ้นภาพนี้</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+ *  หน้านี้ "อ่านอย่างเดียว" ไม่มีการสั่งอะไรกลับไปที่เกม
+ *  เชื่อม WebSocket แล้วส่ง {t:'live'} เพื่อขอรับภาพของห้องที่ออกอากาศ
+ *  เวลาผู้กำกับกด TAKE เซิร์ฟเวอร์ส่ง program + state ใหม่มาให้
+ *  หน้านี้จะ "ไม่รีโหลด" แต่ทำทรานซิชันแล้ววาดห้องใหม่ทับ
+ * ═══════════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const P = new URLSearchParams(location.search);
+const TRANSITION = P.get('t') || 'ink';       // ink | fade | cut
+const { GoGame } = window.GoEngine;
+
+const AUTO = P.get('auto') === '1' || P.get('auto') === 'true';
+
+/* ── ปรับขนาดให้พอดีจอ ──
+ * คอมพิวเตอร์/OBS : รักษาสัดส่วน 1080×1920 พอดีกรอบ
+ * มือถือ (จอสูงกว่า 9:16) : ขยายเต็มความกว้าง แล้วยืดความสูงตามจอจริง
+ *                            เพื่อไม่ให้มีแถบดำตอนแชร์หน้าจอ
+ */
+function fit(){
+  const W = 1080, H = 1920, vw = innerWidth, vh = innerHeight;
+  const tall = vh / vw > H / W;
+  const sc = tall ? vw / W : Math.min(vw / W, vh / H);
+  const h  = tall ? Math.round(vh / sc) : H;
+  const st = $('stage');
+  st.style.height = h + 'px';
+  st.style.marginTop = (-h / 2) + 'px';
+  st.style.transform = `scale(${sc})`;
+  // เขตปลอดภัย: บนมือถือ TikTok มีปุ่มและคอมเมนต์ทับมากกว่า
+  const top = tall ? Math.round(h * 0.12) : 250;
+  const bot = tall ? Math.round(h * 0.30) : 400;
+  st.style.setProperty('--safe-top', top + 'px');
+  st.style.setProperty('--safe-bot', bot + 'px');
+  document.documentElement.style.setProperty('--board-max', Math.min(960, W - 96) + 'px');
+}
+if (AUTO){
+  $('idleBig').textContent = 'รอให้มีคนเริ่มเล่น';
+  $('idleSmall').textContent = 'โหมดอัตโนมัติ — ระบบจะยกห้องที่กำลังเล่นขึ้นภาพให้เอง';
+}
+addEventListener('resize', fit);
+addEventListener('orientationchange', () => setTimeout(fit, 300));
+fit();
+
+/* ── เสียงบนภาพออกอากาศ (iPhone ต้องมีการแตะก่อนถึงจะเล่นได้) ── */
+const Snd = (() => {
+  let ctx = null, on = false;
+  function unlock(){
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    on = true;
+  }
+  function blip(f, d, type='sine', v=.45){
+    if (!ctx || !on) return;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(v, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + d);
+    o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + d);
+  }
+  const map = {
+    stone:      () => blip(330, .085, 'triangle', .5),
+    capture:    () => { blip(190,.15,'square',.4); setTimeout(()=>blip(120,.22,'square',.34),70); },
+    pass:       () => blip(250, .17),
+    game_start: () => { blip(440,.12); setTimeout(()=>blip(660,.19),125); },
+    game_end:   () => { blip(340,.2); setTimeout(()=>blip(226,.32),175); },
+    player_join:() => { blip(520,.1); setTimeout(()=>blip(720,.13),95); },
+    cut:        () => { blip(880,.09,'square',.5); setTimeout(()=>blip(1320,.28,'square',.42),90); },
+  };
+  return { unlock, play: id => map[id] && map[id]() };
+})();
+
+/* ── กันหน้าจอดับระหว่างถ่ายทอด ── */
+let wakeLock = null;
+async function keepAwake(){
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible' && 'wakeLock' in navigator) {
+          try { wakeLock = await navigator.wakeLock.request('screen'); } catch {}
+        }
+      });
+    }
+  } catch {}
+}
+
+$('btnBoot').onclick = () => {
+  Snd.unlock(); keepAwake();
+  $('boot').style.display = 'none';
+  fit();
+};
+
+let view = null, program = null, clockBase = null, localGame = null;
+
+/* ── WebSocket ── */
+let retry = 0;
+function connect(){
+  const ws = new WebSocket(location.origin.replace(/^http/, 'ws'));
+  ws.onopen = () => {
+    retry = 0;
+    ws.send(JSON.stringify({ t:'auth', name:'ภาพออกอากาศ' }));
+    setTimeout(() => ws.send(JSON.stringify({ t:'live', auto: AUTO })), 120);
+  };
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.t === 'program'){
+      const changed = m.code !== program;
+      program = m.code;
+      $('idle').classList.toggle('hidden', !!program);
+      if (changed && program) playTransition(m.transition || TRANSITION);
+    }
+    if (m.t === 'state' || m.t === 'end') applyState(m);
+    if (m.t === 'highlight') playCutscene(m);      // ค่ายกล — เห็นเฉพาะบนไลฟ์
+    if (m.t === 'mc') setMC(m.text);
+    if (m.t === 'sfx') Snd.play(m.id);
+  };
+  ws.onclose = () => setTimeout(connect, Math.min(6000, 700 * ++retry));
+}
+connect();
+
+function playTransition(kind){
+  const c = $('board');
+  c.classList.remove('wipe','fadein');
+  void c.offsetWidth;                       // บังคับให้แอนิเมชันเริ่มใหม่
+  if (kind === 'ink')  c.classList.add('wipe');
+  if (kind === 'fade') c.classList.add('fadein');
+}
+
+function setMC(text){ $('mcText').textContent = text; }
+
+/* ── รับสถานะห้อง ── */
+function applyState(m){
+  if (program && m.code !== program) return;   // สนใจเฉพาะห้องที่ออกอากาศ
+  view = m;
+  clockBase = { at: Date.now(), clocks: m.clocks, turn: m.game.turn };
+
+  localGame = new GoGame({ size:m.game.size, komi:m.game.komi });
+  localGame.board.set(m.game.board);
+  localGame.turn = m.game.turn;
+
+  $('roomTag').textContent = 'ห้อง ' + m.code;
+
+  // ขาวอยู่บน ดำอยู่ล่าง (ตามธรรมเนียมการถ่ายทอดโกะ)
+  paint('top', m.players.white, 2, m);
+  paint('bot', m.players.black, 1, m);
+  $('cardTop').classList.toggle('turn', m.state === 'playing' && m.game.turn === 2);
+  $('cardBot').classList.toggle('turn', m.state === 'playing' && m.game.turn === 1);
+
+  updateBar();
+  draw();
+
+  if (m.state === 'waiting')      setMC('ห้อง ' + m.code + ' กำลังรอคู่แข่ง');
+  else if (m.state === 'ready')   setMC('ผู้เล่นครบแล้ว กำลังจะเริ่ม');
+  else if (m.state === 'playing') setMC(`ตาที่ ${m.game.moveCount} · ${m.game.turn === 1 ? 'ตาดำ' : 'ตาขาว'}`);
+  else if (m.state === 'marking') setMC('จบเกมแล้ว กำลังตกลงหมากตายก่อนนับแต้ม');
+  else if (m.state === 'finished' && m.result){
+    const who = m.result.type === 'black_win' ? 'ดำชนะ'
+              : m.result.type === 'white_win' ? 'ขาวชนะ'
+              : m.result.type === 'draw' ? 'เสมอ' : 'ไม่มีผลแพ้ชนะ';
+    setMC(`${who} · ${m.result.text}${m.result.reason ? ' (' + m.result.reason + ')' : ''}`);
+  }
+}
+
+function paint(pos, p, colorNum, m){
+  $(pos+'Stone').className = 'stone ' + (colorNum === 1 ? 'b' : 'w');
+  $(pos+'Name').textContent = p ? p.name + (p.ai ? ' 🤖' : '') : 'รอผู้เล่น';
+  $(pos+'Rank').textContent = p ? p.rank + ' (ในระบบ)' : '—';
+  $(pos+'Cap').textContent  = 'เชลย ' + (colorNum === 1 ? m.game.prisoners.black : m.game.prisoners.white);
+}
+
+/* ── แถบประเมินคะแนน: อิทธิพลอย่างง่าย + เชลย + โคมิ ── */
+function estimate(){
+  if (!view || !localGame) return { b:0.5, black:0, white:0 };
+  const N = view.game.size, b = view.game.board;
+  // แผนที่อิทธิพล: แผ่จากเม็ดหมากออกไป 4 รอบ (Bouzy อย่างย่อ)
+  let inf = new Float32Array(N*N);
+  for (let i = 0; i < N*N; i++) inf[i] = b[i] === 1 ? 48 : b[i] === 2 ? -48 : 0;
+  for (let pass = 0; pass < 4; pass++){
+    const nx = Float32Array.from(inf);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++){
+      const i = y*N + x; let s = inf[i], n = 1;
+      for (const [ax, ay] of localGame.neighbors(x, y)){ s += inf[ay*N+ax]; n++; }
+      nx[i] = s / n;
+    }
+    inf = nx;
+  }
+  let tb = 0, tw = 0;
+  for (let i = 0; i < N*N; i++){ if (inf[i] > 3) tb++; else if (inf[i] < -3) tw++; }
+  const black = tb + view.game.prisoners.black;
+  const white = tw + view.game.prisoners.white + view.game.komi;
+  const total = black + white || 1;
+  return { b: black / total, black:Math.round(black), white:Math.round(white*10)/10 };
+}
+
+function updateBar(){
+  const e = estimate();
+  const pct = Math.max(6, Math.min(94, e.b * 100));
+  $('barB').style.width = pct + '%';
+  $('barW').style.width = (100 - pct) + '%';
+  $('barBTxt').textContent = 'ดำ ~' + e.black;
+  $('barWTxt').textContent = '~' + e.white + ' ขาว';
+}
+
+/* ── วาดกระดาน ── */
+const cv = $('board'), cx = cv.getContext('2d');
+const LETTERS = 'ABCDEFGHJKLMNOPQRST';
+
+function draw(){
+  if (!view) return;
+  const N = view.game.size, S = 960;
+  const pad = S * (N <= 9 ? .085 : N <= 13 ? .066 : .052);
+  const gap = (S - pad*2) / (N - 1), R = gap * .47;
+  cv.width = S; cv.height = S;
+
+  const g0 = cx.createLinearGradient(0, 0, S, S);
+  g0.addColorStop(0, '#EDC37B'); g0.addColorStop(.55, '#DCAE5E'); g0.addColorStop(1, '#C48E3D');
+  cx.fillStyle = g0; cx.fillRect(0, 0, S, S);
+
+  cx.strokeStyle = '#6B4E22'; cx.lineWidth = N > 13 ? 1.8 : 2.4;
+  for (let i = 0; i < N; i++){
+    const p = pad + i*gap;
+    cx.beginPath(); cx.moveTo(pad, p); cx.lineTo(S-pad, p); cx.stroke();
+    cx.beginPath(); cx.moveTo(p, pad); cx.lineTo(p, S-pad); cx.stroke();
+  }
+  cx.fillStyle = 'rgba(90,64,26,.72)';
+  cx.font = `${Math.max(15, gap*.3)}px 'IBM Plex Sans Thai', sans-serif`;
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  for (let i = 0; i < N; i++){
+    cx.fillText(LETTERS[i], pad + i*gap, pad*.45);
+    cx.fillText(String(N - i), pad*.45, pad + i*gap);
+  }
+  const stars = N === 9 ? [2,4,6] : N === 13 ? [3,6,9] : [3,9,15];
+  cx.fillStyle = '#6B4E22';
+  for (const a of stars) for (const b2 of stars){
+    cx.beginPath(); cx.arc(pad + a*gap, pad + b2*gap, Math.max(4, gap*.09), 0, 7); cx.fill();
+  }
+
+  const dead = new Set(view.dead || []), b = view.game.board;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++){
+    const v = b[y*N + x]; if (!v) continue;
+    const isDead = dead.has(y*N + x);
+    cx.globalAlpha = isDead ? .32 : 1;
+    cx.beginPath(); cx.arc(pad + x*gap + R*.1, pad + y*gap + R*.14, R, 0, 7);
+    cx.fillStyle = 'rgba(60,40,10,.32)'; cx.fill();
+    const px = pad + x*gap, py = pad + y*gap;
+    const g = cx.createRadialGradient(px - R*.34, py - R*.4, R*.08, px, py, R);
+    if (v === 1){ g.addColorStop(0, '#5B534C'); g.addColorStop(1, '#15120F'); }
+    else        { g.addColorStop(0, '#FFFFFB'); g.addColorStop(1, '#D0C8B3'); }
+    cx.beginPath(); cx.arc(px, py, R, 0, 7); cx.fillStyle = g; cx.fill();
+    if (isDead){
+      cx.strokeStyle = '#C2372E'; cx.lineWidth = Math.max(4, gap*.1);
+      cx.beginPath();
+      cx.moveTo(px-R*.5, py-R*.5); cx.lineTo(px+R*.5, py+R*.5);
+      cx.moveTo(px+R*.5, py-R*.5); cx.lineTo(px-R*.5, py+R*.5); cx.stroke();
+    }
+    cx.globalAlpha = 1;
+  }
+
+  const lm = view.game.lastMove;
+  if (lm && !lm.pass){
+    cx.fillStyle = '#C2372E';
+    cx.beginPath(); cx.arc(pad + lm.x*gap, pad + lm.y*gap, R*.3, 0, 7); cx.fill();
+  }
+  if (view.game.koPoint != null){
+    const k = view.game.koPoint, kx = k % N, ky = (k/N)|0;
+    cx.strokeStyle = '#8E251E'; cx.lineWidth = Math.max(3, gap*.08);
+    cx.strokeRect(pad + kx*gap - R*.45, pad + ky*gap - R*.45, R*.9, R*.9);
+  }
+
+  // เรืองแสงเน้นค่ายกล ระหว่างคัตซีน
+  if (cutCoords){
+    cx.strokeStyle = 'rgba(226,181,101,.95)'; cx.lineWidth = Math.max(5, gap*.12);
+    for (const [x, y] of cutCoords){
+      cx.beginPath(); cx.arc(pad + x*gap, pad + y*gap, R*1.28, 0, 7); cx.stroke();
+    }
+  }
+}
+
+/* ── คัตซีนค่ายกล 3 วินาที — เห็นเฉพาะบนไลฟ์ ผู้เล่นไม่เห็น ── */
+let cutCoords = null, cutBusy = false;
+function playCutscene(m){
+  if (cutBusy) return;                     // ไม่ซ้อนกัน คิวถัดไปทิ้ง
+  cutBusy = true;
+  cutCoords = m.coords || null;
+  $('cutName').textContent  = m.nameTh || 'ค่ายกล';
+  $('cutKanji').textContent = m.nameJa || '';
+  $('cutTier').textContent  = m.tier || 'SR';
+  Snd.play('cut');
+  const el = $('cut');
+  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  draw();
+  setTimeout(() => { cutBusy = false; cutCoords = null; el.classList.remove('on'); draw(); }, 3000);
+}
+
+/* ── นาฬิกา ── */
+const fmt = ms => { const s = Math.max(0, Math.ceil(ms/1000)); return `${(s/60)|0}:${String(s%60).padStart(2,'0')}`; };
+setInterval(() => {
+  if (!clockBase || !view) return;
+  const running = view.state === 'playing';
+  const el = running ? Date.now() - clockBase.at : 0;
+  for (const [pos, num] of [['top', 2], ['bot', 1]]){
+    const c = clockBase.clocks[num === 1 ? 'black' : 'white'];
+    if (!c) continue;
+    const live = (running && clockBase.turn === num) ? el : 0;
+    const node = $(pos + 'Clock');
+    if (c.main > 0){
+      const left = c.main - live;
+      node.textContent = fmt(left);
+      node.classList.toggle('warn', left < 30000);
+      node.classList.remove('pulse');
+    } else {
+      const left = Math.max(0, (c.byoyomi || 0) - live);
+      node.textContent = `${Math.ceil(left/1000)} วิ · ${c.periods}`;
+      node.classList.add('warn');
+      node.classList.toggle('pulse', running && clockBase.turn === num);
+    }
+  }
+}, 200);
+
+/* ── ทดสอบคัตซีนจากแถบที่อยู่: /live.html?demo=1 ── */
+if (P.get('demo')){
+  setTimeout(() => playCutscene({
+    nameTh:'ค่ายกลย้อนศร', nameJa:'ウッテガエシ', tier:'SSR',
+    coords:[[3,3],[4,3],[3,4]],
+  }), 1200);
+}
+</script>
+</body>
+</html>

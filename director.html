@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ห้องคอนโทรล — Go Battle Live</title>
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500&display=swap" rel="stylesheet">
+<script src="/go-engine.js"></script>
+<style>
+:root{--sumi:#161311;--sumi-2:#211C18;--sumi-3:#2C2621;--line:#3A322B;
+      --kaya:#E2B565;--shell:#F6F2E7;--shu:#C2372E;--matcha:#7E9468;--muted:#9A8E82}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--sumi);color:var(--shell);font-family:'IBM Plex Sans Thai',sans-serif;
+     padding:18px;max-width:1180px;margin:0 auto}
+h1,h2,h3,button,.dp{font-family:'Mitr',sans-serif;font-weight:500}
+.card{background:var(--sumi-2);border:1px solid var(--line);border-radius:14px;padding:16px}
+.row{display:flex;gap:12px;align-items:center}
+.grow{flex:1}
+.hint{font-size:.8rem;color:var(--muted);line-height:1.6}
+.hidden{display:none !important}
+input{background:var(--sumi-3);border:1px solid var(--line);color:var(--shell);
+      border-radius:10px;padding:12px;font:inherit;width:100%}
+button{border:none;border-radius:11px;padding:12px 18px;cursor:pointer;color:var(--shell);
+       background:var(--sumi-3);border:1px solid var(--line);transition:transform .07s}
+button:active:not(:disabled){transform:scale(.97)}
+button:disabled{opacity:.35;cursor:not-allowed}
+.btn-take{background:var(--shu);color:#fff;border-color:var(--shu);font-size:1.1rem;padding:16px 34px}
+
+.decks{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.deck{border-radius:14px;padding:12px;background:var(--sumi-2);border:2px solid var(--line)}
+.deck.program{border-color:var(--shu)}
+.deck.preview{border-color:var(--matcha)}
+.deck h3{font-size:.78rem;letter-spacing:.14em;margin-bottom:8px}
+.deck.program h3{color:var(--shu)} .deck.preview h3{color:var(--matcha)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px;margin-top:12px}
+.tile{background:var(--sumi-2);border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer}
+.tile.sel{border-color:var(--matcha);box-shadow:0 0 0 1px var(--matcha)}
+.tile.live{border-color:var(--shu);box-shadow:0 0 0 1px var(--shu)}
+.tile canvas{width:100%;height:auto;border-radius:7px;display:block}
+.meta{display:flex;justify-content:space-between;font-size:.76rem;color:var(--muted);margin-top:7px}
+.heat{height:5px;border-radius:3px;background:var(--sumi-3);overflow:hidden;margin-top:6px}
+.heat > i{display:block;height:100%;background:linear-gradient(90deg,var(--matcha),var(--shu))}
+.badge{background:var(--shu);color:#fff;font-size:.66rem;padding:2px 8px;border-radius:999px;font-family:Mitr}
+.tag{font-size:.72rem;color:var(--muted)}
+.sw{display:flex;align-items:center;gap:8px;font-size:.87rem}
+@media(max-width:640px){.decks{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- เข้าสู่ระบบผู้กำกับ -->
+<section id="gate">
+  <h1 style="font-size:1.3rem;margin-bottom:6px">ห้องคอนโทรล</h1>
+  <div class="hint" style="margin-bottom:16px">สลับห้องที่จะขึ้นถ่ายทอดสดบน TikTok</div>
+  <div class="card" style="max-width:400px">
+    <div class="hint" style="margin-bottom:8px">รหัสผู้กำกับ</div>
+    <input id="tok" type="password" placeholder="DIRECTOR_TOKEN">
+    <div style="height:12px"></div>
+    <button class="btn-take" style="width:100%" id="btnEnter">เข้าห้องคอนโทรล</button>
+    <div class="hint" id="gateErr" style="color:#E8877E;margin-top:10px"></div>
+  </div>
+</section>
+
+<!-- หน้าคอนโทรล -->
+<section id="panel" class="hidden">
+  <div class="row" style="margin-bottom:14px">
+    <h1 class="grow" style="font-size:1.2rem">ห้องคอนโทรล</h1>
+    <span class="tag" id="clock">—</span>
+    <span class="tag">ห้องทั้งหมด <b id="nRooms">0</b></span>
+    <a class="tag" href="/live.html" target="_blank" style="color:var(--kaya)">เปิดภาพออกอากาศ ↗</a>
+  </div>
+
+  <div class="decks">
+    <div class="deck program">
+      <h3>PROGRAM · กำลังออกอากาศ</h3>
+      <canvas id="cvProgram" width="380" height="380"></canvas>
+      <div class="meta"><span id="pgTitle">— ไม่มีห้อง —</span><span id="pgInfo"></span></div>
+    </div>
+    <div class="deck preview">
+      <h3>PREVIEW · เตรียมไว้</h3>
+      <canvas id="cvPreview" width="380" height="380"></canvas>
+      <div class="meta"><span id="pvTitle">— ยังไม่ได้เลือก —</span><span id="pvInfo"></span></div>
+    </div>
+  </div>
+
+  <div class="row" style="margin:16px 0;justify-content:center;flex-wrap:wrap">
+    <button class="btn-take" id="btnTake" disabled>▶ TAKE — ส่งขึ้นไลฟ์</button>
+    <button id="btnBlack">จอดำ</button>
+    <label class="sw"><input type="checkbox" id="autoMode" style="width:auto"> สลับอัตโนมัติตามความมัน</label>
+    <span class="hint">ทำงานที่เซิร์ฟเวอร์ ค้างห้องละอย่างน้อย 30 วินาที · ปิดเครื่องนี้แล้วยังทำงานต่อ</span>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="row" style="flex-wrap:wrap">
+      <div style="min-width:220px" class="grow">
+        <div class="hint" style="margin-bottom:6px">ข้อความ MC (ขึ้นบนภาพออกอากาศ)</div>
+        <div class="row">
+          <input id="mcText" class="grow" placeholder="เช่น ตานี้ตัดสินเกมเลยครับ">
+          <button id="btnMC">ส่ง</button>
+        </div>
+      </div>
+      <div style="min-width:260px">
+        <div class="hint" style="margin-bottom:6px">ยิงคัตซีนค่ายกลด้วยมือ</div>
+        <div class="row">
+          <select id="selPattern" class="grow" style="background:var(--sumi-3);border:1px solid var(--line);
+                  color:var(--shell);border-radius:10px;padding:12px;font:inherit">
+            <option value="ค่ายกลย้อนศร|ウッテガエシ|SSR">ค่ายกลย้อนศร · SSR</option>
+            <option value="อาตาริคู่|両アタリ|SR">อาตาริคู่ · SR</option>
+            <option value="แทงกลางตา|ナカデ|SSR">แทงกลางตา · SSR</option>
+            <option value="บันได|シチョウ|SR">บันได · SR</option>
+            <option value="ตาข่าย|ゲタ|SR">ตาข่าย · SR</option>
+            <option value="ปนนุกิ|ポン抜き|R">ปนนุกิ · R</option>
+            <option value="เปิดศึกโคะ|コウ|R">เปิดศึกโคะ · R</option>
+            <option value="เซกิ|セキ|SSR">เซกิ · SSR</option>
+          </select>
+          <button id="btnCut">ยิง</button>
+        </div>
+      </div>
+    </div>
+    <div class="hint" style="margin-top:8px">คัตซีนแสดง 3 วินาที เห็นเฉพาะบนภาพออกอากาศ ผู้เล่นไม่เห็นและเกมไม่หยุด</div>
+  </div>
+
+  <h3 style="font-size:.95rem;margin-top:6px">ห้องที่เปิดอยู่</h3>
+  <div class="hint">แตะการ์ดเพื่อส่งเข้า PREVIEW แล้วกด TAKE เพื่อออกอากาศ</div>
+  <div class="grid" id="grid"></div>
+</section>
+
+<script>
+const $ = id => document.getElementById(id);
+const WS_URL = location.origin.replace(/^http/, 'ws');
+const DWELL_MS = 30000;
+
+let ws = null, token = '', rooms = [], program = null, preview = null;
+let states = new Map();          // code -> state ของห้องนั้น (มาจาก WS เฉพาะห้องที่ออกอากาศ)
+let lastSwitchAt = 0;
+
+$('btnEnter').onclick = () => {
+  token = $('tok').value.trim();
+  if (!token) return $('gateErr').textContent = 'กรุณากรอกรหัสผู้กำกับ';
+  connect();
+};
+$('tok').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnEnter').click(); });
+
+function connect(){
+  ws = new WebSocket(WS_URL);
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ t:'auth', name:'ผู้กำกับ' }));
+    setTimeout(() => ws.send(JSON.stringify({ t:'director_auth', token })), 120);
+  };
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.t === 'director_ok'){
+      $('gate').classList.add('hidden'); $('panel').classList.remove('hidden');
+      program = m.program; poll(); setInterval(poll, 2000);
+      ws.send(JSON.stringify({ t:'auto', value:false }));   // เปิดหน้านี้ = คุมเอง
+    }
+    if (m.t === 'error') $('gateErr').textContent = m.msg;
+    if (m.t === 'program'){ program = m.code; lastSwitchAt = Date.now(); render(); }
+    if (m.t === 'auto'){ $('autoMode').checked = !!m.value; }
+    if (m.t === 'state' || m.t === 'end'){ states.set(m.code, m); render(); }
+  };
+  ws.onclose = () => setTimeout(connect, 2000);
+}
+
+async function poll(){
+  try {
+    const r = await fetch('/api/rooms').then(r => r.json());
+    rooms = r.rooms; program = r.program;
+    $('nRooms').textContent = rooms.length;
+    $('clock').textContent = new Date().toLocaleTimeString('th-TH');
+    syncWatch();
+    render();
+  } catch {}
+}
+
+// ขอรับภาพสดของทุกห้องที่เปิดอยู่ (ผู้กำกับดูได้หลายห้องพร้อมกัน ไม่นั่งเป็นผู้เล่น)
+function syncWatch(){
+  if (!ws || ws.readyState !== 1) return;
+  ws.send(JSON.stringify({ t:'watch', codes: rooms.map(r => r.code) }));
+}
+
+/* โหมดสลับอัตโนมัติทำงานที่เซิร์ฟเวอร์ ไม่ใช่ที่หน้านี้
+   จึงยังทำงานต่อแม้ปิดหน้าเบื้องหลังไปแล้ว — สำคัญมากตอนถ่ายทอดด้วยมือถือ */
+$('autoMode').onchange = () => ws.send(JSON.stringify({ t:'auto', value: $('autoMode').checked }));
+
+function take(code){
+  ws.send(JSON.stringify({ t:'program', code }));
+  lastSwitchAt = Date.now();
+  syncWatch();
+}
+$('btnTake').onclick = () => { if (preview) take(preview); };
+
+$('btnBlack').onclick = () => {
+  if (!confirm('ตัดเป็นจอดำ? ภาพออกอากาศจะไม่มีห้องใดขึ้นเลย')) return;
+  ws.send(JSON.stringify({ t:'program', code:null }));
+  program = null; lastSwitchAt = Date.now(); $('autoMode').checked = false; render();
+};
+
+$('btnMC').onclick = () => {
+  const text = $('mcText').value.trim(); if (!text) return;
+  ws.send(JSON.stringify({ t:'mc', text }));
+  $('mcText').value = '';
+};
+$('mcText').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnMC').click(); });
+
+$('btnCut').onclick = () => {
+  const [nameTh, nameJa, tier] = $('selPattern').value.split('|');
+  // เน้นตาล่าสุดของห้องที่กำลังออกอากาศ
+  const st = program && states.get(program);
+  const lm = st && st.game.lastMove;
+  const coords = lm && !lm.pass ? [[lm.x, lm.y]] : [];
+  ws.send(JSON.stringify({ t:'highlight', nameTh, nameJa, tier, coords }));
+};
+
+function render(){
+  const g = $('grid'); g.innerHTML = '';
+  for (const r of rooms){
+    const el = document.createElement('div');
+    el.className = 'tile' + (r.code === preview ? ' sel' : '') + (r.code === program ? ' live' : '');
+    el.innerHTML = `
+      <canvas width="200" height="200"></canvas>
+      <div class="meta">
+        <span><b>${r.code}</b> ${r.code === program ? '<span class="badge">LIVE</span>' : ''}</span>
+        <span>${r.size}×${r.size}</span>
+      </div>
+      <div class="meta">
+        <span>${r.black || '—'} vs ${r.white || '—'}</span><span>ตาที่ ${r.moves}</span>
+      </div>
+      <div class="heat"><i style="width:${Math.max(3, r.heat)}%"></i></div>`;
+    el.onclick = () => {
+      preview = r.code;
+      $('btnTake').disabled = false;
+      syncWatch();
+      render();
+    };
+    g.appendChild(el);
+    drawMini(el.querySelector('canvas'), states.get(r.code), r.size);
+  }
+  paintDeck('cvProgram', 'pg', program);
+  paintDeck('cvPreview', 'pv', preview);
+}
+
+function paintDeck(canvasId, prefix, code){
+  const st = code && states.get(code);
+  drawMini($(canvasId), st, st ? st.game.size : 9);
+  $(prefix + 'Title').textContent = code ? 'ห้อง ' + code : (prefix === 'pg' ? '— ไม่มีห้อง —' : '— ยังไม่ได้เลือก —');
+  $(prefix + 'Info').textContent = st
+    ? `${st.players.black ? st.players.black.name : '—'} vs ${st.players.white ? st.players.white.name : '—'} · ตาที่ ${st.game.moveCount}`
+    : '';
+}
+
+function drawMini(cv, st, size){
+  const cx = cv.getContext('2d'), S = cv.width, N = (st ? st.game.size : size) || 9;
+  const pad = S * .07, gap = (S - pad*2) / (N - 1), R = gap * .46;
+  cx.fillStyle = '#DCAE5E'; cx.fillRect(0, 0, S, S);
+  cx.strokeStyle = '#6B4E22'; cx.lineWidth = N > 13 ? .7 : 1;
+  for (let i = 0; i < N; i++){
+    const p = pad + i*gap;
+    cx.beginPath(); cx.moveTo(pad,p); cx.lineTo(S-pad,p); cx.stroke();
+    cx.beginPath(); cx.moveTo(p,pad); cx.lineTo(p,S-pad); cx.stroke();
+  }
+  if (!st) return;
+  const b = st.game.board;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++){
+    const v = b[y*N + x]; if (!v) continue;
+    cx.beginPath(); cx.arc(pad + x*gap, pad + y*gap, R, 0, 7);
+    cx.fillStyle = v === 1 ? '#1A1714' : '#F7F3E8'; cx.fill();
+  }
+  const lm = st.game.lastMove;
+  if (lm && !lm.pass){
+    cx.fillStyle = '#C2372E';
+    cx.beginPath(); cx.arc(pad + lm.x*gap, pad + lm.y*gap, R*.35, 0, 7); cx.fill();
+  }
+}
+</script>
+</body>
+</html>

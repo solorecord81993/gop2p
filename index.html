@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#161311">
+<title>Go Battle Live — หมากล้อมออนไลน์</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/go-engine.js"></script>
+<style>
+:root{
+  --sumi:#161311; --sumi-2:#211C18; --sumi-3:#2C2621; --line:#3A322B;
+  --kaya:#E2B565; --shell:#F6F2E7; --shu:#C2372E; --shu-soft:#8E251E;
+  --matcha:#7E9468; --muted:#9A8E82;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--sumi); color:var(--shell);
+  font-family:'IBM Plex Sans Thai',system-ui,sans-serif; font-size:16px;
+  -webkit-font-smoothing:antialiased; overscroll-behavior:none;
+}
+#app{max-width:520px; margin:0 auto; min-height:100%;
+     padding:12px 14px calc(14px + var(--safe-b)); display:flex; flex-direction:column; gap:11px}
+h1,h2,h3,.dp{font-family:'Mitr',sans-serif; font-weight:500}
+
+.card{background:var(--sumi-2); border:1px solid var(--line); border-radius:14px; padding:15px}
+.row{display:flex; gap:9px; align-items:center}
+.grow{flex:1}
+.hint{font-size:.8rem; color:var(--muted); line-height:1.65}
+.err{color:#E8877E; font-size:.85rem; min-height:1.2em}
+.hidden{display:none !important}
+
+label{display:block; font-size:.8rem; color:var(--muted); margin-bottom:5px}
+input,select{width:100%; background:var(--sumi-3); border:1px solid var(--line); color:var(--shell);
+  border-radius:10px; padding:12px; font:inherit; font-size:1rem}
+input:focus,select:focus{outline:2px solid var(--shu); outline-offset:1px}
+
+button{font:inherit; font-family:'Mitr',sans-serif; font-weight:500; cursor:pointer; border:none;
+  border-radius:11px; padding:13px 16px; transition:transform .07s, filter .15s; color:var(--shell)}
+button:active:not(:disabled){transform:scale(.975)}
+button:disabled{opacity:.35; cursor:not-allowed}
+.btn-main{background:var(--shu); color:#fff}
+.btn-ghost{background:var(--sumi-3); border:1px solid var(--line)}
+.btn-wide{width:100%}
+.btn-sm{padding:9px 13px; font-size:.85rem; border-radius:9px}
+
+.seal{display:inline-grid; place-items:center; width:36px; height:36px; border-radius:6px; flex:none;
+  background:var(--shu); color:#fff; font-family:'Mitr'; font-size:1.1rem;
+  box-shadow:inset 0 0 0 1px var(--shu-soft)}
+
+.chips{display:flex; flex-wrap:wrap; gap:7px}
+.chip{background:var(--sumi-3); border:1px solid var(--line); border-radius:999px;
+  padding:9px 14px; font-size:.87rem; cursor:pointer; user-select:none}
+.chip.on{background:var(--shu); border-color:var(--shu); color:#fff}
+
+.pcard{display:flex; align-items:center; gap:11px; padding:11px 13px; border-radius:12px;
+  background:var(--sumi-2); border:1px solid var(--line); border-left:3px solid transparent;
+  transition:border-color .2s, background .2s}
+.pcard.turn{border-left-color:var(--shu); background:#271F1B}
+.pcard.me{box-shadow:inset 0 0 0 1px #4A4038}
+.dot{width:20px;height:20px;border-radius:50%;flex:none;box-shadow:0 1px 2px rgba(0,0,0,.5)}
+.dot.b{background:radial-gradient(circle at 32% 30%, #57504A, #16130F)}
+.dot.w{background:radial-gradient(circle at 32% 30%, #FFFEF8, #CFC7B2)}
+.pname{font-weight:600; font-size:.97rem; line-height:1.25}
+.psub{font-size:.75rem; color:var(--muted)}
+.clock{font-family:'Mitr'; font-size:1.25rem; font-variant-numeric:tabular-nums; text-align:right; line-height:1.1}
+.clock.warn{color:var(--shu)}
+.clock.pulse{animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.45}}
+
+.boardwrap{position:relative}
+canvas{width:100%; height:auto; display:block; border-radius:12px; touch-action:none;
+  box-shadow:0 6px 22px rgba(0,0,0,.45)}
+.shake{animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+
+.status{background:var(--sumi-3); border-left:3px solid var(--shu); padding:11px 13px;
+  border-radius:0 10px 10px 0; font-size:.88rem; line-height:1.6}
+.status.calm{border-left-color:var(--matcha)}
+
+.bar{position:sticky; bottom:0; background:linear-gradient(transparent, var(--sumi) 22%);
+  padding-top:12px; display:flex; gap:9px}
+.toast{position:fixed; left:50%; bottom:calc(22px + var(--safe-b)); transform:translateX(-50%);
+  background:#3A322B; padding:11px 18px; border-radius:11px; font-size:.9rem; z-index:60;
+  max-width:88vw; text-align:center; box-shadow:0 4px 16px rgba(0,0,0,.5)}
+.onair{background:var(--shu); color:#fff; font-size:.7rem; padding:3px 9px; border-radius:999px;
+  font-family:'Mitr'; letter-spacing:.05em}
+.fade{animation:fade .26s ease}
+@keyframes fade{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none !important}}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ═══════════ 1. เข้าสู่ระบบ ═══════════ -->
+<section id="scAuth" class="fade">
+  <div class="row" style="margin-bottom:14px">
+    <span class="seal">碁</span>
+    <div>
+      <h1 style="font-size:1.25rem;line-height:1.2">Go Battle Live</h1>
+      <div class="hint">หมากล้อมออนไลน์ · กติกาสมาคมกีฬาหมากล้อมแห่งประเทศไทย</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="chips" style="margin-bottom:15px">
+      <div class="chip on" data-tab="login">เข้าสู่ระบบ</div>
+      <div class="chip" data-tab="signup">สมัครสมาชิก</div>
+    </div>
+
+    <div id="tabLogin">
+      <label>อีเมล</label><input id="liEmail" type="email" autocomplete="email" inputmode="email">
+      <div style="height:11px"></div>
+      <label>รหัสผ่าน</label><input id="liPass" type="password" autocomplete="current-password">
+      <div style="height:15px"></div>
+      <button class="btn-main btn-wide" id="btnLogin">เข้าสู่ระบบ</button>
+    </div>
+
+    <div id="tabSignup" class="hidden">
+      <label>ชื่อที่ใช้แสดง</label><input id="suName" maxlength="24" placeholder="เช่น น้องโกะ">
+      <div style="height:11px"></div>
+      <label>อีเมล</label><input id="suEmail" type="email" autocomplete="email" inputmode="email">
+      <div style="height:11px"></div>
+      <label>รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label><input id="suPass" type="password" autocomplete="new-password">
+      <div style="height:11px"></div>
+      <label>ปีเกิด พ.ศ.</label><input id="suYear" type="number" inputmode="numeric" placeholder="2555">
+      <div id="guardianWrap" class="hidden" style="margin-top:11px">
+        <label>อีเมลผู้ปกครอง — จำเป็นสำหรับผู้ที่อายุต่ำกว่า 13 ปี</label>
+        <input id="suGuardian" type="email" inputmode="email">
+      </div>
+      <div style="height:11px"></div>
+      <label>ประเมินฝีมือตัวเอง (ปรับได้ภายหลัง)</label>
+      <select id="suRank">
+        <option value="100">เพิ่งเริ่มหัด — 20 คิว</option>
+        <option value="600">พอเล่นเป็น — 15 คิว</option>
+        <option value="1100">เล่นมาสักพัก — 10 คิว</option>
+        <option value="1600">แข่งมาบ้าง — 5 คิว</option>
+        <option value="2000">ใกล้ระดับดั้ง — 1 คิว</option>
+        <option value="2100">ระดับดั้ง — 1 ดั้ง</option>
+      </select>
+      <div style="height:15px"></div>
+      <button class="btn-main btn-wide" id="btnSignup">สมัครสมาชิก</button>
+    </div>
+
+    <div class="err" id="authErr" style="margin-top:11px"></div>
+    <div style="border-top:1px solid var(--line); margin:14px 0"></div>
+    <button class="btn-ghost btn-wide" id="btnGuest">เล่นเลยแบบผู้มาเยือน</button>
+    <div class="hint" style="margin-top:9px">ผู้มาเยือนเล่นได้ครบทุกอย่าง แต่จะไม่มีดั้งและไม่ขึ้นตารางอันดับ</div>
+  </div>
+</section>
+
+<!-- ═══════════ 2. หน้าแรก ═══════════ -->
+<section id="scHome" class="hidden fade">
+  <div class="row">
+    <span class="seal">碁</span>
+    <div class="grow">
+      <div class="pname" id="meName">—</div>
+      <div class="psub" id="meRank">—</div>
+    </div>
+    <button class="btn-ghost btn-sm" id="btnSound">🔊</button>
+    <button class="btn-ghost btn-sm" id="btnLogout">ออก</button>
+  </div>
+
+  <div class="card" id="firstTime">
+    <div class="row" style="align-items:flex-start">
+      <div class="grow hint" style="color:var(--shell)">
+        <b>เล่นยังไง</b><br>
+        ผลัดกันวางหมากเพื่อล้อมพื้นที่ให้ได้มากกว่าอีกฝ่าย ล้อมหมากคู่แข่งจนหมดลมหายใจจะจับกินได้
+        เมื่อไม่มีที่จะเล่นแล้วให้กด “ผ่าน” ทั้งสองฝ่าย แล้วนับแต้มกัน
+      </div>
+      <button class="btn-ghost btn-sm" id="btnDismissHelp">เข้าใจแล้ว</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="font-size:1rem;margin-bottom:12px">เริ่มเกมใหม่</h3>
+    <label>ขนาดกระดาน</label>
+    <div class="chips" id="sizeChips">
+      <div class="chip on" data-size="9">9×9<span class="psub" style="margin-left:6px">โคมิ 1.5</span></div>
+      <div class="chip" data-size="13">13×13<span class="psub" style="margin-left:6px">โคมิ 3.5</span></div>
+      <div class="chip" data-size="19">19×19<span class="psub" style="margin-left:6px">โคมิ 6.5</span></div>
+    </div>
+    <div class="hint" style="margin-top:7px" id="sizeHint">9×9 จบเร็วราว 10 นาที เหมาะกับผู้เริ่มต้นและการถ่ายทอดสด</div>
+
+    <div style="height:14px"></div>
+    <label>เวลาแข่ง</label>
+    <select id="selTime">
+      <option value="300,30,3">โหมดไลฟ์ · 5 นาที + เบียวโยมิ 30 วิ × 3</option>
+      <option value="1200,0,0">Friendship · 20 นาที</option>
+      <option value="2100,0,0">ระดับคิว · 35 นาที</option>
+      <option value="2700,0,0">ระดับดั้ง · 45 นาที</option>
+      <option value="3600,10,3">คัดตัวทีมชาติ · 60 นาที + เบียวโยมิ 10 วิ × 3</option>
+    </select>
+
+    <div style="height:15px"></div>
+    <button class="btn-main btn-wide" id="btnCreate">สร้างห้องรอคู่แข่ง</button>
+    <div style="height:9px"></div>
+    <div class="row">
+      <select id="selAI" class="grow">
+        <option value="seed15k|น้องเมล็ด|0.10|600">น้องเมล็ด · 15 คิว</option>
+        <option value="bamboo10k|พี่ไผ่|0.32|1100">พี่ไผ่ · 10 คิว</option>
+        <option value="ping8k|พี่ครูปิง|0.60|1300">พี่ครูปิง · 8 คิว</option>
+      </select>
+      <button class="btn-ghost" id="btnAI" style="white-space:nowrap">ซ้อมกับ AI</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="font-size:1rem;margin-bottom:12px">เข้าห้องเพื่อน</h3>
+    <div class="row">
+      <input id="inCode" class="grow" maxlength="6" placeholder="ABC123" autocapitalize="characters"
+             style="text-transform:uppercase;letter-spacing:.2em;font-family:Mitr;text-align:center">
+      <button class="btn-main" id="btnJoin">เข้า</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 3. หน้าเกม ═══════════ -->
+<section id="scGame" class="hidden fade">
+  <div class="row">
+    <button class="btn-ghost btn-sm" id="btnLeave">← ออก</button>
+    <div class="grow" style="text-align:center">
+      <span id="onAirBadge" class="onair hidden">● ออกอากาศ</span>
+    </div>
+    <button class="btn-ghost btn-sm" id="btnSound2">🔊</button>
+    <button class="btn-ghost btn-sm" id="btnCopy">รหัส <span id="gCode" style="color:var(--kaya)">——</span></button>
+  </div>
+
+  <div id="pTop" class="pcard">
+    <span class="dot" id="topDot"></span>
+    <div class="grow"><div class="pname" id="topName">รอผู้เล่น</div><div class="psub" id="topSub">—</div></div>
+    <div><div class="clock" id="topClock">—</div><div class="psub" id="topCap" style="text-align:right">เชลย 0</div></div>
+  </div>
+
+  <div class="boardwrap"><canvas id="board" width="900" height="900"></canvas></div>
+
+  <div id="pBot" class="pcard me">
+    <span class="dot" id="botDot"></span>
+    <div class="grow"><div class="pname" id="botName">รอผู้เล่น</div><div class="psub" id="botSub">—</div></div>
+    <div><div class="clock" id="botClock">—</div><div class="psub" id="botCap" style="text-align:right">เชลย 0</div></div>
+  </div>
+
+  <div id="statusBar" class="status">กำลังเชื่อมต่อ…</div>
+
+  <div class="bar" id="barWait">
+    <button class="btn-main grow" id="btnReady">พร้อมแล้ว</button>
+  </div>
+
+  <div class="bar hidden" id="barConfirm">
+    <button class="btn-ghost" id="btnCancelMove">ยกเลิก</button>
+    <button class="btn-main grow" id="btnPlaceHere">วางตรงนี้</button>
+  </div>
+
+  <div class="bar hidden" id="barPlay">
+    <button class="btn-ghost grow" id="btnPass">ผ่าน</button>
+    <button class="btn-ghost grow" id="btnResign">ยอมแพ้</button>
+  </div>
+
+  <div class="hidden" id="barMark">
+    <div class="status" style="margin-bottom:10px">
+      แตะหมู่หมากที่ <b>ตายแล้ว</b> เพื่อทำเครื่องหมายกากบาท พื้นที่จะคำนวณให้ดูทันที
+      เมื่อทั้งสองฝ่ายกดยืนยันตรงกัน ระบบจะนับแต้มให้
+    </div>
+    <div class="row">
+      <button class="btn-main grow" id="btnConfirm">ยืนยันนับแต้ม</button>
+      <button class="btn-ghost grow" id="btnResume">ยังไม่ตกลง</button>
+    </div>
+  </div>
+
+  <div class="hidden card" id="barEnd">
+    <h3 id="endTitle" style="font-size:1.3rem;margin-bottom:7px">—</h3>
+    <div class="hint" id="endDetail"></div>
+    <div style="height:14px"></div>
+    <div class="row">
+      <button class="btn-ghost grow" id="btnSGF">บันทึก SGF</button>
+      <button class="btn-main grow" id="btnHome">กลับหน้าแรก</button>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+ *  ตั้งค่า — ใส่ค่าของโปรเจกต์ Supabase ของคุณตรงนี้
+ *  anon key เปิดเผยได้ ปลอดภัยเพราะมี RLS คุมอยู่แล้ว
+ * ═══════════════════════════════════════════════════════════ */
+const CONFIG = {
+  SUPABASE_URL: 'https://msllwhkdppprymojhcwv.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zbGx3aGtkcHBwcnltb2poY3d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4Mzc5MzksImV4cCI6MjEwMDQxMzkzOX0.KgVRMgkIlStIrfdM6yjRmaev0PJi7Mp1bZejJqMmOSc',
+  SERVER_URL: location.origin.replace(/^http/, 'ws'),
+};
+
+const hasSB = !CONFIG.SUPABASE_URL.includes('YOUR-PROJECT');
+const sb = hasSB ? supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
+const { GoGame } = window.GoEngine;
+
+const $ = id => document.getElementById(id);
+const show = id => ['scAuth','scHome','scGame'].forEach(s => $(s).classList.toggle('hidden', s !== id));
+function toast(msg){
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const el = document.createElement('div'); el.className = 'toast'; el.textContent = msg;
+  document.body.appendChild(el); setTimeout(() => el.remove(), 2500);
+}
+
+/* ═══════════ เสียง — Web Audio ทั้งหมด ═══════════ */
+const Sound = (() => {
+  let ctx = null, bus = {}, on = localStorage.getItem('gb_sound') !== 'off';
+  const buffers = new Map();
+  function init(){
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    for (const n of ['bgm','sfx','voice']) {
+      const g = ctx.createGain(); g.gain.value = n === 'bgm' ? .3 : .65;
+      g.connect(ctx.destination); bus[n] = g;
+    }
+  }
+  const unlock = () => { init(); if (ctx.state === 'suspended') ctx.resume(); };
+  function blip(f, d, type='sine', b='sfx', v=.5){
+    if (!ctx || !on) return;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(v, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + d);
+    o.connect(g); g.connect(bus[b]); o.start(); o.stop(ctx.currentTime + d);
+  }
+  const SFX = {
+    stone:      () => blip(330, .085, 'triangle', 'sfx', .6),
+    capture:    () => { blip(190,.15,'square','sfx',.42); setTimeout(()=>blip(120,.22,'square','sfx',.36),70); },
+    pass:       () => blip(250, .17),
+    player_join:() => { blip(520,.1); setTimeout(()=>blip(720,.13),95); },
+    game_start: () => { blip(440,.12); setTimeout(()=>blip(660,.19),125); },
+    game_end:   () => { blip(340,.2); setTimeout(()=>blip(226,.32),175); },
+    illegal:    () => blip(105, .13, 'sawtooth', 'sfx', .32),
+    tick:       () => blip(880, .04, 'sine', 'sfx', .25),
+  };
+  function playBuf(id){
+    const s = ctx.createBufferSource(); s.buffer = buffers.get(id);
+    s.connect(bus.sfx); s.start();
+  }
+  /* BGM ใช้ AudioBufferSourceNode + loop=true เท่านั้น
+     จึงไม่มีทางที่เพลงจะเงียบเองตอนจบแทร็ก (บั๊กเดิมของ Math Battle) */
+  let bgmSrc = null;
+  const stopBGM = () => { if (bgmSrc){ try{ bgmSrc.stop(); }catch{} bgmSrc = null; } };
+  function playBGM(id){
+    const buf = buffers.get(id); if (!ctx || !buf) return;
+    stopBGM();
+    bgmSrc = ctx.createBufferSource(); bgmSrc.buffer = buf;
+    bgmSrc.loop = true; bgmSrc.connect(bus.bgm); bgmSrc.start();
+  }
+  /* โหลดไฟล์เสียงให้ครบก่อนเริ่มเล่น (Preload Gate)
+     เซิร์ฟเวอร์ส่งมาแค่ "ชื่อเสียง" ทุกเครื่องเล่นจากไฟล์ของตัวเอง
+     จึงไม่มีอาการเสียงดังแค่ฝั่งโฮสต์อีก */
+  async function preload(manifest, onProgress){
+    init(); let done = 0;
+    for (const { id, url } of manifest){
+      try {
+        const buf = await fetch(url).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b));
+        buffers.set(id, buf);
+      } catch(e){ console.warn('โหลดเสียงไม่สำเร็จ', id, e); }
+      onProgress && onProgress(++done / manifest.length);
+    }
+  }
+  return {
+    unlock, preload, playBGM, stopBGM, buffers,
+    play: id => { if (!on) return; buffers.has(id) ? playBuf(id) : (SFX[id] && SFX[id]()); },
+    toggle(){ on = !on; localStorage.setItem('gb_sound', on ? 'on' : 'off'); if (!on) stopBGM(); return on; },
+    get isOn(){ return on; },
+  };
+})();
+document.addEventListener('pointerdown', () => Sound.unlock(), { once:true });
+const soundBtns = [$('btnSound'), $('btnSound2')];
+const paintSound = () => soundBtns.forEach(b => b.textContent = Sound.isOn ? '🔊' : '🔇');
+soundBtns.forEach(b => b.onclick = () => { Sound.toggle(); paintSound(); });
+paintSound();
+
+/* ═══════════ สถานะฝั่งเบราว์เซอร์ ═══════════ */
+let ws = null, myColor = null, view = null, boardSize = 9;
+let accessToken = null, myGor = null;
+let playerToken = localStorage.getItem('gb_token') || null;
+let ghost = null;        // ตาที่เลือกไว้แต่ยังไม่ยืนยัน
+let clockBase = null;
+let localGame = null;    // สำเนาเกมฝั่งเบราว์เซอร์ ใช้ตรวจกติกาและคำนวณพื้นที่ทันที
+let lastByoTick = 0;
+const isTouch = matchMedia('(pointer: coarse)').matches;
+
+/* ═══════════ ยืนยันตัวตน ═══════════ */
+document.querySelectorAll('[data-tab]').forEach(c => c.onclick = () => {
+  document.querySelectorAll('[data-tab]').forEach(x => x.classList.remove('on'));
+  c.classList.add('on');
+  $('tabLogin').classList.toggle('hidden', c.dataset.tab !== 'login');
+  $('tabSignup').classList.toggle('hidden', c.dataset.tab !== 'signup');
+});
+
+$('suYear').oninput = () => {
+  const y = parseInt($('suYear').value, 10);
+  const age = (new Date().getFullYear() + 543) - y;
+  $('guardianWrap').classList.toggle('hidden', !(y > 2400 && age < 13));
+};
+
+$('btnSignup').onclick = async () => {
+  $('authErr').textContent = '';
+  if (!sb) return $('authErr').textContent = 'ยังไม่ได้ตั้งค่า Supabase ในไฟล์ index.html';
+  const name = $('suName').value.trim(), email = $('suEmail').value.trim(), pass = $('suPass').value;
+  const yearBE = parseInt($('suYear').value, 10);
+  const age = (new Date().getFullYear() + 543) - yearBE;
+  if (name.length < 2) return $('authErr').textContent = 'ชื่อที่ใช้แสดงต้องยาวอย่างน้อย 2 ตัวอักษร';
+  if (pass.length < 6) return $('authErr').textContent = 'รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร';
+  if (yearBE > 2400 && age < 13 && !$('suGuardian').value.trim())
+    return $('authErr').textContent = 'ผู้ที่อายุต่ำกว่า 13 ปี ต้องกรอกอีเมลผู้ปกครอง';
+
+  const { data, error } = await sb.auth.signUp({
+    email, password: pass, options: { data: { display_name: name } },
+  });
+  if (error) return $('authErr').textContent = error.message;
+  if (data.user){
+    if (yearBE > 2400) {
+      await sb.from('profiles').update({
+        birth_year: yearBE - 543,
+        guardian_email: $('suGuardian').value.trim() || null,
+      }).eq('id', data.user.id);
+    }
+    const gor = +$('suRank').value;
+    for (const size of [9, 13, 19]) {
+      await sb.from('ratings').upsert({ user_id: data.user.id, board_size: size, gor, peak_gor: gor });
+    }
+  }
+  if (!data.session) return toast('สมัครเรียบร้อย — กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ');
+  afterLogin(data.session);
+};
+
+$('btnLogin').onclick = async () => {
+  $('authErr').textContent = '';
+  if (!sb) return $('authErr').textContent = 'ยังไม่ได้ตั้งค่า Supabase ในไฟล์ index.html';
+  const { data, error } = await sb.auth.signInWithPassword({
+    email: $('liEmail').value.trim(), password: $('liPass').value,
+  });
+  if (error) return $('authErr').textContent = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+  afterLogin(data.session);
+};
+
+$('btnGuest').onclick  = () => { accessToken = null; connect('ผู้มาเยือน'); };
+$('btnLogout').onclick = async () => { if (sb) await sb.auth.signOut(); location.reload(); };
+
+async function afterLogin(session){
+  accessToken = session.access_token;
+  const { data: p } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
+  const { data: r } = await sb.from('ratings').select('*').eq('user_id', session.user.id).eq('board_size', 19);
+  myGor = r && r[0] ? r[0].gor : null;
+  $('meName').textContent = (p && p.display_name) || 'ผู้เล่น';
+  $('meRank').textContent = myGor != null
+    ? `${gorLabel(myGor)} ในระบบ${r[0].is_provisional ? ' (ยังทดลอง)' : ''}`
+    : 'ยังไม่มีดั้ง';
+  connect(p && p.display_name);
+}
+const gorLabel = g => g == null ? '—'
+  : g >= 2100 ? `${Math.min(9, Math.floor((g - 2000) / 100))} ดั้ง`
+              : `${Math.min(30, Math.max(1, Math.ceil((2100 - g) / 100)))} คิว`;
+
+if (sb) sb.auth.getSession().then(({ data }) => { if (data.session) afterLogin(data.session); });
+if (localStorage.getItem('gb_helped')) $('firstTime').classList.add('hidden');
+$('btnDismissHelp').onclick = () => { localStorage.setItem('gb_helped','1'); $('firstTime').classList.add('hidden'); };
+
+/* ═══════════ WebSocket ═══════════ */
+let retry = 0, pendingRoom = null;
+function connect(name){
+  ws = new WebSocket(CONFIG.SERVER_URL);
+  ws.onopen = () => { retry = 0; ws.send(JSON.stringify({ t:'auth', accessToken, name, playerToken })); };
+  ws.onclose = () => {
+    $('statusBar').textContent = 'หลุดการเชื่อมต่อ — กำลังต่อใหม่…';
+    setTimeout(() => connect(name), Math.min(8000, 800 * ++retry));
+  };
+  ws.onmessage = e => onMessage(JSON.parse(e.data));
+}
+const sendWs = o => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
+
+function onMessage(m){
+  switch (m.t){
+    case 'welcome':
+      playerToken = m.playerToken; localStorage.setItem('gb_token', playerToken);
+      if ($('meName').textContent === '—') $('meName').textContent = m.name;
+      if (m.guest) $('meRank').textContent = 'ผู้มาเยือน — ไม่คิดดั้ง';
+      if (!m.dbOn) console.info('เซิร์ฟเวอร์ยังไม่ได้เชื่อม Supabase — เล่นได้แต่ไม่บันทึกผล');
+      if (pendingRoom){ sendWs({ t:'join', code: pendingRoom }); pendingRoom = null; }
+      else show('scHome');
+      break;
+    case 'joined':
+      myColor = m.color; ghost = null; show('scGame');
+      $('gCode').textContent = m.code;
+      history.replaceState(null, '', '#' + m.code);
+      if (m.spectator)   toast('ที่นั่งเต็มแล้ว — เข้าชมในฐานะผู้ชม');
+      if (m.reconnected) toast('กลับเข้าเกมเรียบร้อย');
+      break;
+    case 'state': applyState(m); break;
+    case 'end':   applyState(m); showEnd(m); break;
+    case 'sfx':   Sound.play(m.id); break;
+    case 'emoji': toast((m.from || '') + ' ' + m.id); break;
+    case 'error': toast(m.msg); Sound.play('illegal'); shake(); break;
+  }
+}
+const shake = () => { const c = $('board'); c.classList.add('shake'); setTimeout(() => c.classList.remove('shake'), 320); };
+
+/* ═══════════ ปุ่มหน้าแรก ═══════════ */
+const SIZE_HINT = {
+  9:  '9×9 จบเร็วราว 10 นาที เหมาะกับผู้เริ่มต้นและการถ่ายทอดสด',
+  13: '13×13 ใช้เวลาราว 25 นาที เป็นขนาดที่สมาคมฯ ใช้กับระดับ 9–12 คิว',
+  19: '19×19 ขนาดมาตรฐานการแข่งขัน ใช้เวลานาน เหมาะกับผู้ที่ชำนาญแล้ว',
+};
+document.querySelectorAll('#sizeChips .chip').forEach(c => c.onclick = () => {
+  document.querySelectorAll('#sizeChips .chip').forEach(x => x.classList.remove('on'));
+  c.classList.add('on');
+  $('sizeHint').textContent = SIZE_HINT[c.dataset.size];
+});
+const chosenSize = () => +document.querySelector('#sizeChips .chip.on').dataset.size;
+const chosenTime = () => { const [m,b,p] = $('selTime').value.split(',').map(Number); return { main:m, byoyomi:b, periods:p }; };
+
+$('btnCreate').onclick = () => sendWs({ t:'create', size:chosenSize(), timeRule:chosenTime() });
+$('btnAI').onclick = () => {
+  const [id, name, strength, gor] = $('selAI').value.split('|');
+  sendWs({ t:'create', size:chosenSize(), timeRule:chosenTime(), vsAI:true,
+           ai:{ id, name, strength:+strength, gor:+gor } });
+};
+$('btnJoin').onclick = () => {
+  const code = $('inCode').value.trim().toUpperCase();
+  if (code.length === 6) sendWs({ t:'join', code }); else toast('รหัสห้องมี 6 ตัวอักษร');
+};
+$('inCode').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnJoin').click(); });
+if (location.hash.length === 7) pendingRoom = location.hash.slice(1).toUpperCase();
+
+/* ═══════════ ปุ่มในเกม ═══════════ */
+$('btnReady').onclick      = () => sendWs({ t:'ready', value:true });
+$('btnPass').onclick       = () => { if (confirm('ผ่านตานี้? ถ้าอีกฝ่ายผ่านต่อ เกมจะจบและเข้าสู่การนับแต้ม')) sendWs({ t:'pass' }); };
+$('btnResign').onclick     = () => { if (confirm('ยืนยันยอมแพ้?')) sendWs({ t:'resign' }); };
+$('btnConfirm').onclick    = () => sendWs({ t:'confirm_score' });
+$('btnResume').onclick     = () => sendWs({ t:'resume_play' });
+$('btnCancelMove').onclick = () => { ghost = null; paintBars(); paintStatus(); draw(); };
+$('btnPlaceHere').onclick  = () => { if (ghost){ sendWs({ t:'play', x:ghost.x, y:ghost.y }); ghost = null; paintBars(); } };
+$('btnLeave').onclick      = () => { location.hash = ''; location.reload(); };
+$('btnHome').onclick       = () => { location.hash = ''; location.reload(); };
+$('btnCopy').onclick = async () => {
+  const code = $('gCode').textContent;
+  try { await navigator.clipboard.writeText(location.origin + '/#' + code); toast('คัดลอกลิงก์ห้องแล้ว'); }
+  catch { toast('รหัสห้องคือ ' + code); }
+};
+$('btnSGF').onclick = () => {
+  if (!localGame) return;
+  const sgf = localGame.toSGF({ event:'Go Battle Live', date:new Date().toISOString().slice(0,10) });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([sgf], { type:'application/x-go-sgf' }));
+  a.download = `gobattle-${$('gCode').textContent}.sgf`; a.click();
+};
+
+/* ═══════════ รับสถานะจากเซิร์ฟเวอร์ ═══════════ */
+function applyState(m){
+  view = m; boardSize = m.game.size;
+  clockBase = { at: Date.now(), clocks: m.clocks, turn: m.game.turn };
+
+  // สำเนาเกมฝั่งเบราว์เซอร์ ใช้ตรวจกติกาและคำนวณพื้นที่โดยไม่ต้องรอเซิร์ฟเวอร์
+  localGame = new GoGame({ size: m.game.size, komi: m.game.komi });
+  localGame.board.set(m.game.board);
+  localGame.turn = m.game.turn;
+  localGame.koPoint = m.game.koPoint;
+  localGame.state = 'playing';
+
+  // มุมมอง: ฝ่ายเรา (หรือดำถ้าเป็นผู้ชม) อยู่ด้านล่างเสมอ
+  const meIsWhite = myColor === 'W';
+  const P = m.players;
+  paintCard('top', meIsWhite ? P.black : P.white, meIsWhite ? 1 : 2, m);
+  paintCard('bot', meIsWhite ? P.white : P.black, meIsWhite ? 2 : 1, m);
+  $('pTop').classList.toggle('turn', m.state === 'playing' && m.game.turn === (meIsWhite ? 1 : 2));
+  $('pBot').classList.toggle('turn', m.state === 'playing' && m.game.turn === (meIsWhite ? 2 : 1));
+  $('onAirBadge').classList.toggle('hidden', !m.onAir);
+
+  paintBars(); paintStatus(); draw();
+}
+
+function paintCard(pos, p, colorNum, m){
+  $(pos+'Dot').className = 'dot ' + (colorNum === 1 ? 'b' : 'w');
+  $(pos+'Name').textContent = p
+    ? p.name + (p.ai ? ' 🤖' : '') + (!p.ai && p.online === false ? ' (หลุด)' : '')
+    : 'รอผู้เล่น';
+  $(pos+'Sub').textContent = p ? p.rank : '—';
+  $(pos+'Cap').textContent = 'เชลย ' + (colorNum === 1 ? m.game.prisoners.black : m.game.prisoners.white);
+}
+
+function paintBars(){
+  const s = view && view.state;
+  const myTurn = view && myColor && view.game.turn === (myColor === 'B' ? 1 : 2);
+  $('barWait').classList.toggle('hidden', !(s === 'waiting' || s === 'ready'));
+  $('barConfirm').classList.toggle('hidden', !(s === 'playing' && ghost));
+  $('barPlay').classList.toggle('hidden', !(s === 'playing' && !ghost));
+  $('barMark').classList.toggle('hidden', s !== 'marking');
+  $('barEnd').classList.toggle('hidden', s !== 'finished');
+  const ready = view && (myColor === 'B' ? view.ready.black : view.ready.white);
+  $('btnReady').textContent = ready ? 'พร้อมแล้ว ✓ รออีกฝ่าย' : 'พร้อมแล้ว';
+  $('btnReady').disabled = !!ready || !myColor;
+  $('btnPass').disabled = !myTurn;
+  $('btnResign').disabled = !myColor;
+}
+
+function paintStatus(){
+  const st = $('statusBar'), m = view; if (!m) return;
+  st.classList.remove('calm');
+  if (m.state === 'waiting'){
+    st.innerHTML = `รอคู่แข่ง — กดปุ่ม <b>รหัส ${m.code}</b> มุมขวาบนเพื่อคัดลอกลิงก์ส่งให้เพื่อน`;
+    st.classList.add('calm');
+  } else if (m.state === 'ready'){
+    st.textContent = 'อีกฝ่ายเข้ามาแล้ว — กด “พร้อมแล้ว” ทั้งคู่เพื่อเริ่มเกม';
+    st.classList.add('calm');
+  } else if (m.state === 'playing'){
+    const myTurn = myColor && m.game.turn === (myColor === 'B' ? 1 : 2);
+    st.textContent = myColor
+      ? (myTurn ? (ghost ? 'ตรวจดูตำแหน่งแล้วกด “วางตรงนี้”' : 'ตาของคุณ — แตะกระดานเพื่อเลือกจุด')
+                : 'รออีกฝ่ายเดิน…')
+      : `กำลังชม · ${m.game.turn === 1 ? 'ตาดำ' : 'ตาขาว'} ตาที่ ${m.game.moveCount}`;
+    if (!myTurn) st.classList.add('calm');
+  } else if (m.state === 'marking'){
+    const mine = myColor === 'B' ? m.confirms.black : m.confirms.white;
+    st.textContent = mine ? 'คุณยืนยันแล้ว — รออีกฝ่ายยืนยัน' : 'ทำเครื่องหมายหมากที่ตายแล้ว จากนั้นกดยืนยัน';
+  }
+}
+
+function showEnd(m){
+  const r = m.result, s = m.score || r.score;
+  const who = r.type === 'black_win' ? 'ดำชนะ' : r.type === 'white_win' ? 'ขาวชนะ'
+            : r.type === 'draw' ? 'เสมอ' : 'ไม่มีผลแพ้ชนะ';
+  $('endTitle').textContent = `${who} · ${r.text}`;
+  $('endDetail').innerHTML = s
+    ? `<b>ดำ ${s.black}</b> = พื้นที่ ${s.territory.black} + เชลย ${s.prisoners.black}<br>`
+    + `<b>ขาว ${s.white}</b> = พื้นที่ ${s.territory.white} + เชลย ${s.prisoners.white} + โคมิ ${s.komi}<br>`
+    + `<span style="color:var(--muted)">ดาเมะ ${s.dameCount} จุด ไม่นับเป็นแต้มของฝ่ายใด (กติกาญี่ปุ่น)</span>`
+    : (r.reason || '');
+  paintBars();
+}
+
+/* ═══════════ วาดกระดาน ═══════════ */
+const cv = $('board'), cx = cv.getContext('2d');
+const LETTERS = 'ABCDEFGHJKLMNOPQRST';
+let geo = null;
+
+function computeGeo(){
+  const N = boardSize, S = 900;
+  const pad = S * (N <= 9 ? .085 : N <= 13 ? .065 : .05);
+  const gap = (S - pad * 2) / (N - 1);
+  geo = { N, S, pad, gap, R: gap * .47 };
+  return geo;
+}
+
+// คำนวณพื้นที่คร่าว ๆ ฝั่งเบราว์เซอร์ ใช้แสดงตอนตกลงหมากตาย
+function territoryPreview(dead){
+  if (!localGame) return null;
+  const N = boardSize, b = Uint8Array.from(localGame.board);
+  for (const i of dead) b[i] = 0;
+  const owner = new Int8Array(N * N), seen = new Uint8Array(N * N);
+  for (let i = 0; i < N * N; i++){
+    if (b[i] !== 0 || seen[i]) continue;
+    const pts = [], borders = new Set(), stack = [i]; seen[i] = 1;
+    while (stack.length){
+      const j = stack.pop(); pts.push(j);
+      const jx = j % N, jy = (j / N) | 0;
+      for (const [nx, ny] of localGame.neighbors(jx, jy)){
+        const ni = ny * N + nx;
+        if (b[ni] === 0){ if (!seen[ni]){ seen[ni] = 1; stack.push(ni); } }
+        else borders.add(b[ni]);
+      }
+    }
+    if (borders.size === 1){ const c = [...borders][0]; for (const p of pts) owner[p] = c; }
+  }
+  return owner;
+}
+
+function draw(){
+  if (!view) return;
+  const { N, S, pad, gap, R } = computeGeo();
+  cv.width = S; cv.height = S;
+
+  // พื้นไม้
+  const g0 = cx.createLinearGradient(0, 0, S, S);
+  g0.addColorStop(0, '#EDC37B'); g0.addColorStop(.55, '#DCAE5E'); g0.addColorStop(1, '#C48E3D');
+  cx.fillStyle = g0; cx.fillRect(0, 0, S, S);
+
+  // เส้นกระดาน
+  cx.strokeStyle = '#6B4E22'; cx.lineWidth = N > 13 ? 1.6 : 2.2;
+  for (let i = 0; i < N; i++){
+    const p = pad + i * gap;
+    cx.beginPath(); cx.moveTo(pad, p); cx.lineTo(S - pad, p); cx.stroke();
+    cx.beginPath(); cx.moveTo(p, pad); cx.lineTo(p, S - pad); cx.stroke();
+  }
+  // พิกัดตัวอักษร/ตัวเลข ช่วยผู้เริ่มต้นและใช้เรียกตำแหน่งตอนไลฟ์
+  cx.fillStyle = 'rgba(90,64,26,.75)';
+  cx.font = `${Math.max(14, gap * .32)}px 'IBM Plex Sans Thai', sans-serif`;
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  for (let i = 0; i < N; i++){
+    cx.fillText(LETTERS[i], pad + i * gap, pad * .45);
+    cx.fillText(String(N - i), pad * .45, pad + i * gap);
+  }
+
+  // จุดดาว
+  const stars = N === 9 ? [2,4,6] : N === 13 ? [3,6,9] : [3,9,15];
+  cx.fillStyle = '#6B4E22';
+  for (const a of stars) for (const b of stars){
+    cx.beginPath(); cx.arc(pad + a*gap, pad + b*gap, Math.max(3.5, gap*.09), 0, 7); cx.fill();
+  }
+
+  const dead = new Set(view.dead || []);
+  const board = view.game.board;
+
+  // เงาพื้นที่ ตอนตกลงหมากตาย
+  if (view.state === 'marking'){
+    const owner = territoryPreview(dead);
+    if (owner) for (let i = 0; i < N*N; i++){
+      if (!owner[i]) continue;
+      const x = i % N, y = (i / N) | 0;
+      cx.fillStyle = owner[i] === 1 ? 'rgba(20,16,12,.34)' : 'rgba(255,252,242,.5)';
+      cx.fillRect(pad + x*gap - gap*.2, pad + y*gap - gap*.2, gap*.4, gap*.4);
+    }
+  }
+
+  // หมาก
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++){
+    const v = board[y*N + x]; if (!v) continue;
+    const isDead = dead.has(y*N + x);
+    drawStone(x, y, v, isDead ? .3 : 1);
+    if (isDead){
+      const px = pad + x*gap, py = pad + y*gap;
+      cx.strokeStyle = '#C2372E'; cx.lineWidth = Math.max(3, gap*.09);
+      cx.beginPath();
+      cx.moveTo(px - R*.5, py - R*.5); cx.lineTo(px + R*.5, py + R*.5);
+      cx.moveTo(px + R*.5, py - R*.5); cx.lineTo(px - R*.5, py + R*.5); cx.stroke();
+    }
+  }
+
+  // ตาล่าสุด — จุดตราประทับสีชาด
+  const lm = view.game.lastMove;
+  if (lm && !lm.pass && !ghost){
+    cx.fillStyle = '#C2372E';
+    cx.beginPath(); cx.arc(pad + lm.x*gap, pad + lm.y*gap, R*.3, 0, 7); cx.fill();
+  }
+
+  // จุดติดโคะ
+  if (view.game.koPoint != null){
+    const k = view.game.koPoint, kx = k % N, ky = (k / N) | 0;
+    cx.strokeStyle = '#8E251E'; cx.lineWidth = Math.max(2.5, gap*.08);
+    cx.strokeRect(pad + kx*gap - R*.45, pad + ky*gap - R*.45, R*.9, R*.9);
+  }
+
+  // หมากที่กำลังเล็งไว้ (ยังไม่ยืนยัน)
+  if (ghost){
+    drawStone(ghost.x, ghost.y, myColor === 'B' ? 1 : 2, .55);
+    cx.strokeStyle = '#C2372E'; cx.lineWidth = Math.max(3, gap*.08);
+    cx.beginPath(); cx.arc(pad + ghost.x*gap, pad + ghost.y*gap, R*1.25, 0, 7); cx.stroke();
+  }
+}
+
+function drawStone(x, y, color, alpha){
+  const { pad, gap, R } = geo;
+  const px = pad + x*gap, py = pad + y*gap;
+  cx.globalAlpha = alpha;
+  cx.beginPath(); cx.arc(px + R*.09, py + R*.13, R, 0, 7);
+  cx.fillStyle = 'rgba(60,40,10,.3)'; cx.fill();
+  const g = cx.createRadialGradient(px - R*.34, py - R*.4, R*.08, px, py, R);
+  if (color === 1){ g.addColorStop(0, '#5B534C'); g.addColorStop(1, '#15120F'); }
+  else            { g.addColorStop(0, '#FFFFFB'); g.addColorStop(1, '#D0C8B3'); }
+  cx.beginPath(); cx.arc(px, py, R, 0, 7); cx.fillStyle = g; cx.fill();
+  cx.globalAlpha = 1;
+}
+
+/* ═══════════ แตะกระดาน ═══════════
+ * มือถือ: แตะเลือกจุด → ตรวจดู → กด “วางตรงนี้” (กันวางพลาด)
+ * เมาส์ : คลิกวางได้เลย
+ */
+function pointAt(ev){
+  const { N, S, pad, gap } = computeGeo();
+  const r = cv.getBoundingClientRect(), sc = S / r.width;
+  const fx = ((ev.clientX - r.left) * sc - pad) / gap;
+  const fy = ((ev.clientY - r.top ) * sc - pad) / gap;
+  const x = Math.round(fx), y = Math.round(fy);
+  if (x < 0 || y < 0 || x >= N || y >= N) return null;
+  if (Math.hypot(fx - x, fy - y) > .62) return null;   // แตะห่างจากจุดตัดเกินไป
+  return { x, y };
+}
+
+cv.addEventListener('click', ev => {
+  if (!view) return;
+  const p = pointAt(ev); if (!p) return;
+
+  if (view.state === 'marking'){
+    if (view.game.board[p.y * boardSize + p.x] === 0) return toast('แตะที่ตัวหมาก ไม่ใช่จุดว่าง');
+    sendWs({ t:'toggle_dead', x:p.x, y:p.y });
+    return;
+  }
+  if (view.state !== 'playing' || !myColor) return;
+  if (view.game.turn !== (myColor === 'B' ? 1 : 2)) return toast('ยังไม่ถึงตาของคุณ');
+
+  // ตรวจกติกาทันทีฝั่งเบราว์เซอร์ — ไม่ต้องรอเซิร์ฟเวอร์ตอบ
+  const reason = localGame && localGame.illegalReason(p.x, p.y, myColor === 'B' ? 1 : 2);
+  if (reason){ toast(reason); Sound.play('illegal'); shake(); return; }
+
+  if (!isTouch){ sendWs({ t:'play', x:p.x, y:p.y }); return; }
+  ghost = p; paintBars(); paintStatus(); draw();
+});
+
+/* ═══════════ นาฬิกา — เซิร์ฟเวอร์เป็นเจ้าของ เบราว์เซอร์แค่วาดตาม ═══════════ */
+const fmt = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${(s/60)|0}:${String(s%60).padStart(2,'0')}`; };
+setInterval(() => {
+  if (!clockBase || !view || view.state !== 'playing') return;
+  const el = Date.now() - clockBase.at;
+  const meIsWhite = myColor === 'W';
+  for (const [pos, num] of [['top', meIsWhite ? 1 : 2], ['bot', meIsWhite ? 2 : 1]]){
+    const c = clockBase.clocks[num === 1 ? 'black' : 'white'];
+    const live = clockBase.turn === num ? el : 0;
+    const node = $(pos + 'Clock');
+    if (c.main > 0){
+      const left = c.main - live;
+      node.textContent = fmt(left);
+      node.classList.toggle('warn', left < 30000);
+      node.classList.remove('pulse');
+    } else {
+      const left = Math.max(0, (c.byoyomi || 0) - live);
+      node.textContent = `${Math.ceil(left/1000)} วิ · ${c.periods} รอบ`;
+      node.classList.add('warn');
+      node.classList.toggle('pulse', clockBase.turn === num);
+      if (clockBase.turn === num && myColor && num === (myColor === 'B' ? 1 : 2)){
+        const s = Math.ceil(left / 1000);
+        if (s <= 5 && s !== lastByoTick){ lastByoTick = s; Sound.play('tick'); }
+      }
+    }
+  }
+}, 200);
+
+window.addEventListener('resize', () => draw());
+</script>
+</body>
+</html>
