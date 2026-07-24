@@ -343,7 +343,7 @@ const sb = hasSB ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPA
 
 // เอนจินโกะใช้ตรวจกติกาและคำนวณพื้นที่ฝั่งเบราว์เซอร์
 // ถ้าโหลดไม่ได้ก็ยังเล่นได้ เพียงแต่ต้องรอเซิร์ฟเวอร์ตอบว่าตาไหนผิดกติกา
-const GoGame = (window.GoEngine && window.GoEngine.GoGame) || null;
+const GoBoard = (window.GoEngine && window.GoEngine.GoGame) || null;   // ตั้งชื่อไม่ให้ชนกับคลาสในไลบรารี
 const show = id => ['scAuth','scHome','scGame'].forEach(s => $(s).classList.toggle('hidden', s !== id));
 function toast(msg){
   document.querySelectorAll('.toast').forEach(t => t.remove());
@@ -497,7 +497,11 @@ let ghost = null;        // ตาที่เลือกไว้แต่ย�
 let clockBase = null;
 let localGame = null;    // สำเนาเกมฝั่งเบราว์เซอร์ ใช้ตรวจกติกาและคำนวณพื้นที่ทันที
 let lastByoTick = 0;
-const isTouch = matchMedia('(pointer: coarse)').matches;
+// ตรวจว่าเป็นหน้าจอสัมผัสหรือไม่ — ห่อ try ไว้เพราะบางสภาพแวดล้อมไม่มี matchMedia
+const isTouch = (() => {
+  try { return window.matchMedia && window.matchMedia('(pointer: coarse)').matches; }
+  catch { return 'ontouchstart' in window; }
+})();
 
 /* ═══════════ ยืนยันตัวตน ═══════════ */
 document.querySelectorAll('[data-tab]').forEach(c => c.onclick = () => {
@@ -622,7 +626,7 @@ function paintNet(extra){
   if (extra !== undefined) netExtra = extra;
   const parts = [
     sb ? T('home.netDb') : T('home.netDbNo'),
-    GoGame ? T('home.netEngine') : T('home.netEngineNo'),
+    GoBoard ? T('home.netEngine') : T('home.netEngineNo'),
   ];
   if (netExtra) parts.push(netExtra);
   const el = $('netStatus'); if (el) el.textContent = parts.join(' · ');
@@ -736,8 +740,8 @@ function applyState(m){
   clockBase = { at: Date.now(), clocks: m.clocks, turn: m.game.turn };
 
   // สำเนาเกมฝั่งเบราว์เซอร์ ใช้ตรวจกติกาและคำนวณพื้นที่โดยไม่ต้องรอเซิร์ฟเวอร์
-  if (GoGame){
-    localGame = new GoGame({ size: m.game.size, komi: m.game.komi });
+  if (GoBoard){
+    localGame = new GoBoard({ size: m.game.size, komi: m.game.komi });
     localGame.board.set(m.game.board);
     localGame.turn = m.game.turn;
     localGame.koPoint = m.game.koPoint;

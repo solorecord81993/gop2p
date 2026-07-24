@@ -219,9 +219,12 @@ addEventListener('error', e => {
   if (el) el.textContent = 'Error: ' + (e.message || '?');
 });
 const TRANSITION = P.get('t') || 'ink';       // ink | fade | cut
-const GoGame = (window.GoEngine && window.GoEngine.GoGame) || null;   // ถ้าโหลดไม่ได้ ยังแสดงภาพได้ปกติ
+const GoBoard = (window.GoEngine && window.GoEngine.GoGame) || null;   // ตั้งชื่อไม่ให้ชนกับคลาสในไลบรารี   // ถ้าโหลดไม่ได้ ยังแสดงภาพได้ปกติ
 
 const AUTO = P.get('auto') === '1' || P.get('auto') === 'true';
+
+// ประกาศไว้ตั้งแต่ต้น เพราะ applyLang() ด้านล่างอ้างถึง view
+let view = null, program = null, clockBase = null, localGame = null;
 const I = window.I18N || { T:(k)=>k, SPEECH_LANG:{th:'th-TH',en:'en-US',ja:'ja-JP'}, rankLabel:()=> '—' };
 let LANG = ['th','en','ja'].includes(P.get('lang')) ? P.get('lang') : 'th';
 const T = (k, v) => I.T(k, v, LANG);
@@ -393,7 +396,6 @@ $('btnBoot').onclick = () => {
   fetch('/api/manifest').then(r => r.json()).then(applyManifest).catch(() => {});
 };
 
-let view = null, program = null, clockBase = null, localGame = null;
 
 /* ── WebSocket ── */
 let retry = 0;
@@ -471,8 +473,8 @@ function applyState(m){
   view = m;
   clockBase = { at: Date.now(), clocks: m.clocks, turn: m.game.turn };
 
-  if (GoGame){
-    localGame = new GoGame({ size:m.game.size, komi:m.game.komi });
+  if (GoBoard){
+    localGame = new GoBoard({ size:m.game.size, komi:m.game.komi });
     localGame.board.set(m.game.board);
     localGame.turn = m.game.turn;
   }

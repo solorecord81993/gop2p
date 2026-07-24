@@ -205,6 +205,7 @@ const WS_URL = location.origin.replace(/^http/, 'ws');
 const DWELL_MS = 30000;
 
 let ws = null, token = '', rooms = [], program = null, preview = null;
+let SET = null;   // การตั้งค่าที่โหลดมาจากเซิร์ฟเวอร์ (ต้องประกาศก่อน applyLang เรียกใช้)
 let states = new Map();          // code -> state ของห้องนั้น (มาจาก WS เฉพาะห้องที่ออกอากาศ)
 let lastSwitchAt = 0;
 
@@ -282,7 +283,6 @@ $('btnBlack').onclick = () => {
 };
 
 /* ═══════════ หน้าตั้งค่า ═══════════ */
-let SET = null;
 const setHeaders = () => ({ 'x-director-token': token });
 
 $('btnSettings').onclick = async () => {
