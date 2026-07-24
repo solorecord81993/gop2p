@@ -7,6 +7,13 @@
  * (บั๊กเดิมของ Math Battle คือสลับภาษาแล้วมีคำค้างอยู่ภาษาเดิม)
  * ===================================================================== */
 
+/* ห่อด้วย IIFE เพื่อไม่ให้ตัวแปรรั่วไปชนกับสคริปต์อื่นในหน้าเดียวกัน
+   (บั๊กเดิม: go-engine.js กับ i18n.js ประกาศ EXPORTS ซ้ำกัน
+    ทำให้ไฟล์ที่โหลดทีหลังพังทั้งไฟล์ และหน้าเว็บกลายเป็นช่องว่างเปล่า) */
+(function () {
+'use strict';
+
+
 const LANGS = ['th', 'en', 'ja'];
 const LANG_NAMES = { th: 'ไทย', en: 'English', ja: '日本語' };
 const SPEECH_LANG = { th: 'th-TH', en: 'en-US', ja: 'ja-JP' };
@@ -780,6 +787,7 @@ function rankLabel(gor, lang) {
   return T('rank.kyu', { n: Math.min(30, Math.max(1, Math.ceil((2100 - gor) / 100))) }, lang);
 }
 
-const EXPORTS = { DICT, LANGS, LANG_NAMES, SPEECH_LANG, T, rankLabel };
-if (typeof module !== 'undefined' && module.exports) module.exports = EXPORTS;
-if (typeof window !== 'undefined') window.I18N = EXPORTS;
+const __EXPORTS__ = { DICT, LANGS, LANG_NAMES, SPEECH_LANG, T, rankLabel };
+if (typeof module !== 'undefined' && module.exports) module.exports = __EXPORTS__;
+if (typeof window !== 'undefined') window.I18N = __EXPORTS__;
+})();

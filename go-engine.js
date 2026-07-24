@@ -12,6 +12,13 @@
  * ใช้ได้ทั้งใน Node (เซิร์ฟเวอร์เกม) และในเบราว์เซอร์ ไม่มี dependency
  * ===================================================================== */
 
+/* ห่อด้วย IIFE เพื่อไม่ให้ตัวแปรรั่วไปชนกับสคริปต์อื่นในหน้าเดียวกัน
+   (บั๊กเดิม: go-engine.js กับ i18n.js ประกาศ EXPORTS ซ้ำกัน
+    ทำให้ไฟล์ที่โหลดทีหลังพังทั้งไฟล์ และหน้าเว็บกลายเป็นช่องว่างเปล่า) */
+(function () {
+'use strict';
+
+
 const EMPTY = 0, BLACK = 1, WHITE = 2;
 
 const KOMI_BY_SIZE = { 9: 1.5, 13: 3.5, 19: 6.5 };   // ตามที่สมาคมฯ ประกาศ
@@ -426,6 +433,7 @@ class GoGame {
   }
 }
 
-const EXPORTS = { GoGame, EMPTY, BLACK, WHITE, KOMI_BY_SIZE, HANDICAP_POINTS };
-if (typeof module !== 'undefined' && module.exports) module.exports = EXPORTS;
-if (typeof window !== 'undefined') window.GoEngine = EXPORTS;
+const __EXPORTS__ = { GoGame, EMPTY, BLACK, WHITE, KOMI_BY_SIZE, HANDICAP_POINTS };
+if (typeof module !== 'undefined' && module.exports) module.exports = __EXPORTS__;
+if (typeof window !== 'undefined') window.GoEngine = __EXPORTS__;
+})();
