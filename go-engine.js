@@ -89,14 +89,16 @@ class GoGame {
   }
 
   /* ---------------- ตรวจความถูกต้องของตา ---------------- */
-  // คืน null ถ้าเดินได้ หรือข้อความเหตุผลถ้าเดินไม่ได้
+  // คืน null ถ้าเดินได้ หรือ "รหัสเหตุผล" ถ้าเดินไม่ได้
+  // ใช้รหัสแทนข้อความ เพื่อให้หน้าเว็บแปลเป็นภาษาที่ผู้เล่นเลือกได้
+  // รหัสทั้งหมด: game_over | not_your_turn | off_board | occupied | ko | suicide
   illegalReason(x, y, color) {
-    if (this.state !== 'playing')       return 'เกมจบแล้ว';
-    if (color !== this.turn)            return 'ยังไม่ถึงตาของฝ่ายนี้';
-    if (!this.onBoard(x, y))            return 'นอกกระดาน';
+    if (this.state !== 'playing')       return 'game_over';
+    if (color !== this.turn)            return 'not_your_turn';
+    if (!this.onBoard(x, y))            return 'off_board';
     const i = this.idx(x, y);
-    if (this.board[i] !== EMPTY)        return 'จุดนี้มีหมากอยู่แล้ว';
-    if (this.koPoint === i)             return 'ติดโคะ — กินคืนทันทีไม่ได้';
+    if (this.board[i] !== EMPTY)        return 'occupied';
+    if (this.koPoint === i)             return 'ko';
 
     // ลองวางแล้วดูผล
     this.board[i] = color;
@@ -111,7 +113,7 @@ class GoGame {
     const suicide = captures === 0 && own.liberties.size === 0;
     this.board[i] = EMPTY;
 
-    if (suicide) return 'ห้ามวางฆ่าตัวตาย';
+    if (suicide) return 'suicide';
     return null;
   }
 
@@ -160,8 +162,8 @@ class GoGame {
   }
 
   pass(color) {
-    if (this.state !== 'playing') return { ok: false, error: 'เกมจบแล้ว' };
-    if (color !== this.turn)      return { ok: false, error: 'ยังไม่ถึงตาของฝ่ายนี้' };
+    if (this.state !== 'playing') return { ok: false, error: 'game_over' };
+    if (color !== this.turn)      return { ok: false, error: 'not_your_turn' };
     this.history.push({ color, pass: true });
     this.koPoint = null;
     this.passes += 1;
@@ -179,7 +181,7 @@ class GoGame {
     this.result = {
       type: color === BLACK ? 'white_win' : 'black_win',
       text: (color === BLACK ? 'W+R' : 'B+R'),
-      reason: 'ยอมแพ้',
+      reason: 'ยอมแพ้', reasonCode: 'resign',
     };
     return this.result;
   }

@@ -26,6 +26,9 @@ const path = require('path');
 const { WebSocketServer } = require('ws');
 const { GoGame, BLACK, WHITE, KOMI_BY_SIZE } = require('./go-engine.js');
 const AI = require('./ai-light.js');
+const { T } = require('./i18n.js');
+const { MCEngine, contextFromRoom, CFG: MC_CFG, setConfig: mcSetConfig, configSummary: mcSummary } = require('./mc.js');
+const SETTINGS = require('./settings.js');
 
 const PORT            = process.env.PORT || 3000;
 const SUPABASE_URL    = process.env.SUPABASE_URL || '';
@@ -212,6 +215,12 @@ function everyone(room) {
 function send(ws, obj) {
   if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
 }
+
+// ส่งข้อผิดพลาดเป็น "รหัส" เพื่อให้หน้าเว็บแปลเป็นภาษาที่ผู้ใช้เลือกเอง
+// แนบข้อความไทยไปด้วยสำหรับไคลเอนต์เก่าและสำหรับดู log
+function sendErr(ws, code) {
+  send(ws, { t: 'error', code, msg: T('srv.' + code, null, 'th') });
+}
 function broadcast(room, obj) {
   const msg = JSON.stringify(obj);
   for (const ws of everyone(room)) if (ws.readyState === 1) ws.send(msg);
@@ -250,6 +259,40 @@ function publicState(room) {
 
 function pushState(room) { broadcast(room, { t: 'state', ...publicState(room) }); }
 
+/* =====================================================================
+ * ระบบ MC พากย์อัตโนมัติ — พูดตลอดเวลาบนภาพออกอากาศ
+ * ใช้ Groq ก่อน ถ้าไม่ได้ลอง OpenRouter ถ้ายังไม่ได้ใช้คำพากย์สำเร็จรูป
+ * จึงไม่มีทางเงียบ แม้ไม่ได้ใส่คีย์ AI เลย
+ * ===================================================================== */
+const mc = new MCEngine();
+let mcAuto = true;
+
+async function mcSpeak(kind = 'idle', extra = {}, force = false) {
+  if (!mcAuto || liveViewers.size === 0) return;
+  if (!mc.ready(Date.now(), force)) return;
+  const room = programRoom && rooms.get(programRoom);
+  const ctx = room
+    ? contextFromRoom(room, {
+        blackRank: gorToLabel(room.seats[BLACK]?.gor),
+        whiteRank: gorToLabel(room.seats[WHITE]?.gor),
+        ...extra,
+      })
+    : { size: 9, komi: 1.5, moveCount: 0, turn: BLACK, capB: 0, capW: 0,
+        blackName: '—', whiteName: '—', blackRank: '—', whiteRank: '—', ...extra };
+  try {
+    const r = await mc.say(ctx, kind);
+    for (const v of liveViewers) send(v, { t: 'mc', text: r.text, lang: r.lang, source: r.source, kind });
+  } catch (e) {
+    console.warn('[mc]', e.message);
+  }
+}
+
+// ไฟล์เสียงเปลี่ยน -> บอกทุกเครื่องให้โหลดใหม่เงียบ ๆ
+function broadcastManifest() {
+  const msg = JSON.stringify({ t: 'manifest', ...SETTINGS.manifest() });
+  for (const ws of wss.clients) if (ws.readyState === 1) ws.send(msg);
+}
+
 // ตั้งห้องที่ออกอากาศ ส่ง null = จอดำ
 function setProgram(code, transition = 'ink') {
   programRoom = code;
@@ -259,6 +302,7 @@ function setProgram(code, transition = 'ink') {
   if (room) {
     for (const v of liveViewers) send(v, { t: 'state', ...publicState(room) });
     pushState(room);
+    mcSpeak('start', { event: 'the broadcast just switched to this room' }, true);
   }
 }
 
@@ -305,6 +349,7 @@ function endGame(room, result, extra = {}) {
   room.turnStartedAt = null;
   broadcast(room, { t: 'end', result, ...extra, ...publicState(room) });
   broadcast(room, { t: 'sfx', id: 'game_end' });
+  if (programRoom === room.code) mcSpeak('end', { event: 'the game just finished: ' + result.text }, true);
   saveGame(room, result).catch(e => console.error('[save]', e.message));
 }
 
@@ -313,13 +358,13 @@ function timeoutLoss(room) {
   endGame(room, {
     type: loser === BLACK ? 'white_win' : 'black_win',
     text: loser === BLACK ? 'W+T' : 'B+T',
-    reason: 'หมดเวลา',
+    reason: 'หมดเวลา', reasonCode: 'timeout',
   });
 }
 
 function doPlay(room, color, x, y) {
-  if (room.state !== 'playing') return { error: 'ยังไม่เริ่มเล่น' };
-  if (room.game.turn !== color) return { error: 'ยังไม่ถึงตาของคุณ' };
+  if (room.state !== 'playing') return { error: 'not_started' };
+  if (room.game.turn !== color) return { error: 'not_your_turn' };
   if (applyElapsed(room)) { timeoutLoss(room); return { handled: true }; }
 
   const r = room.game.play(x, y, color);
@@ -327,9 +372,14 @@ function doPlay(room, color, x, y) {
 
   updateHeat(room, r.captured.length);
   broadcast(room, { t: 'sfx', id: r.captured.length ? 'capture' : 'stone' });
+  if (programRoom === room.code) {
+    mcSpeak(r.captured.length ? 'capture' : 'move',
+            r.captured.length ? { lastCapture: r.captured.length } : {},
+            r.captured.length >= 3);
+  }
 
   if (r.noResult) {
-    endGame(room, { type: 'no_result', text: 'ไม่มีผลแพ้ชนะ', reason: 'ตำแหน่งซ้ำ (ซันโคะ)' });
+    endGame(room, { type: 'no_result', text: 'No result', reason: 'ตำแหน่งซ้ำ (ซันโคะ)', reasonCode: 'repeat' });
     return { handled: true };
   }
   pushState(room);
@@ -338,8 +388,8 @@ function doPlay(room, color, x, y) {
 }
 
 function doPass(room, color) {
-  if (room.state !== 'playing') return { error: 'ยังไม่เริ่มเล่น' };
-  if (room.game.turn !== color) return { error: 'ยังไม่ถึงตาของคุณ' };
+  if (room.state !== 'playing') return { error: 'not_started' };
+  if (room.game.turn !== color) return { error: 'not_your_turn' };
   if (applyElapsed(room)) { timeoutLoss(room); return { handled: true }; }
 
   const r = room.game.pass(color);
@@ -474,6 +524,10 @@ function autoPickRoom() {
 setInterval(() => {
   const now = Date.now();
   autoPickRoom();
+  if (mcAuto && liveViewers.size && mc.idle(now)) {
+    const r = programRoom && rooms.get(programRoom);
+    mcSpeak(r && r.state === 'playing' ? 'idle' : 'idle');
+  }
   for (const room of rooms.values()) {
     if (room.state === 'playing' && room.turnStartedAt) {
       const c = room.game.turn;
@@ -490,7 +544,7 @@ setInterval(() => {
         endGame(room, {
           type: c === BLACK ? 'white_win' : 'black_win',
           text: c === BLACK ? 'W+F' : 'B+F',
-          reason: 'ผู้เล่นหลุดเกินเวลาที่กำหนด',
+          reason: 'ผู้เล่นหลุดเกินเวลาที่กำหนด', reasonCode: 'forfeit',
         });
       }
     }
@@ -507,8 +561,90 @@ setInterval(() => {
  * ===================================================================== */
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 
-const server = http.createServer((req, res) => {
+function readBody(req, maxBytes) {
+  return new Promise((resolve, reject) => {
+    const chunks = []; let n = 0;
+    req.on('data', c => {
+      n += c.length;
+      if (n > maxBytes) { reject(new Error('ไฟล์ใหญ่เกินกำหนด')); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+const json = (res, code, obj) => {
+  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(obj));
+};
+const isDirector = req => (req.headers['x-director-token'] || '') === DIRECTOR_TOKEN;
+
+const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
+
+  /* ---------- รายการไฟล์เสียงสำหรับโหลดล่วงหน้า (เปิดสาธารณะ) ---------- */
+  if (url.pathname === '/api/manifest') return json(res, 200, SETTINGS.manifest());
+
+  /* ---------- ไฟล์เสียงในหน่วยความจำ (ใช้เมื่อไม่ได้ตั้ง Supabase) ---------- */
+  if (url.pathname.startsWith('/api/audio/') && req.method === 'GET') {
+    const slot = url.pathname.split('/')[3];
+    const f = SETTINGS.getMemoryFile(slot);
+    if (!f) { res.writeHead(404); return res.end('not found'); }
+    res.writeHead(200, { 'Content-Type': f.mime, 'Cache-Control': 'no-cache' });
+    return res.end(f.buf);
+  }
+
+  /* ---------- หน้าตั้งค่าของผู้กำกับ ---------- */
+  if (url.pathname === '/api/settings') {
+    if (!isDirector(req)) return json(res, 403, { error: 'no_permission' });
+    if (req.method === 'GET') {
+      return json(res, 200, {
+        mc: mcSummary(),
+        audio: SETTINGS.manifest(),
+        slots: SETTINGS.SLOTS,
+        audioTypes: SETTINGS.AUDIO_TYPES,
+        storage: SETTINGS.DB_ON ? 'supabase' : 'memory',
+      });
+    }
+    if (req.method === 'POST') {
+      try {
+        const body = JSON.parse((await readBody(req, 64 * 1024)).toString('utf8') || '{}');
+        const patch = {};
+        for (const k of ['groqKey', 'orKey', 'groqModel', 'orModel', 'lang', 'minGapMs', 'idleMs'])
+          if (body[k] !== undefined && body[k] !== '') patch[k] = body[k];
+        if (typeof body.enabled === 'boolean') patch.enabled = body.enabled;
+        if (patch.minGapMs) patch.minGapMs = Number(patch.minGapMs);
+        if (patch.idleMs)   patch.idleMs   = Number(patch.idleMs);
+        await SETTINGS.saveMC(patch);
+        mcSetConfig(patch);
+        if (patch.lang) mc.setLang(patch.lang);
+        return json(res, 200, { ok: true, mc: mcSummary() });
+      } catch (e) {
+        return json(res, 400, { error: e.message });
+      }
+    }
+  }
+
+  /* ---------- อัปโหลด / ลบไฟล์เสียง ---------- */
+  if (url.pathname.startsWith('/api/audio/') && (req.method === 'PUT' || req.method === 'DELETE')) {
+    if (!isDirector(req)) return json(res, 403, { error: 'no_permission' });
+    const slot = url.pathname.split('/')[3];
+    if (!SETTINGS.SLOT_IDS.includes(slot)) return json(res, 400, { error: 'ไม่รู้จักช่องเสียงนี้' });
+    try {
+      if (req.method === 'DELETE') {
+        await SETTINGS.removeAudio(slot);
+      } else {
+        const buf = await readBody(req, 10 * 1024 * 1024);
+        await SETTINGS.uploadAudio(slot, buf, req.headers['content-type'],
+                                   decodeURIComponent(req.headers['x-file-name'] || ''));
+      }
+      broadcastManifest();
+      return json(res, 200, { ok: true, audio: SETTINGS.manifest() });
+    } catch (e) {
+      return json(res, 400, { error: e.message });
+    }
+  }
+
   if (url.pathname === '/healthz') { res.writeHead(200); return res.end('ok'); }
   if (url.pathname === '/api/rooms') {
     const list = [...rooms.values()].map(r => ({
@@ -521,6 +657,10 @@ const server = http.createServer((req, res) => {
     return res.end(JSON.stringify({ rooms: list, program: programRoom }));
   }
   // เอนจินโกะใช้ร่วมกันระหว่างเซิร์ฟเวอร์กับเบราว์เซอร์ (ตรวจตาผิดกติกาได้ทันทีฝั่งผู้เล่น)
+  if (url.pathname === '/i18n.js') {
+    res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8' });
+    return res.end(fs.readFileSync(path.join(__dirname, 'i18n.js')));
+  }
   if (url.pathname === '/go-engine.js') {
     res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8' });
     return res.end(fs.readFileSync(path.join(__dirname, 'go-engine.js')));
@@ -549,7 +689,7 @@ wss.on('connection', (ws) => {
   ws.on('message', async (raw) => {
     let m; try { m = JSON.parse(raw); } catch { return; }
     try { await handle(ws, m); }
-    catch (e) { console.error('[handle]', e); send(ws, { t: 'error', msg: 'เกิดข้อผิดพลาดในเซิร์ฟเวอร์' }); }
+    catch (e) { console.error('[handle]', e); sendErr(ws, 'internal'); }
   });
 
   ws.on('close', () => {
@@ -590,12 +730,13 @@ async function handle(ws, m) {
       identity.token = m.playerToken || Math.random().toString(36).slice(2) + Date.now().toString(36);
       ws.identity = identity;
       send(ws, { t: 'welcome', playerToken: identity.token, name: identity.name, guest: identity.guest, dbOn: DB_ON });
+      send(ws, { t: 'manifest', ...SETTINGS.manifest() });
       return;
     }
 
     /* ---- สร้างห้อง ---- */
     case 'create': {
-      if (!ws.identity) return send(ws, { t: 'error', msg: 'ยังไม่ได้ยืนยันตัวตน' });
+      if (!ws.identity) return sendErr(ws, 'not_authed');
       const room = createRoom(m);
       const color = m.color === 'W' ? WHITE : BLACK;
       let gor = 100;
@@ -616,9 +757,9 @@ async function handle(ws, m) {
 
     /* ---- เข้าห้อง / กลับเข้าห้องหลังหลุด ---- */
     case 'join': {
-      if (!ws.identity) return send(ws, { t: 'error', msg: 'ยังไม่ได้ยืนยันตัวตน' });
+      if (!ws.identity) return sendErr(ws, 'not_authed');
       const room = rooms.get((m.code || '').toUpperCase());
-      if (!room) return send(ws, { t: 'error', msg: 'ไม่พบห้องนี้' });
+      if (!room) return sendErr(ws, 'no_room');
 
       // กลับเข้าที่นั่งเดิม
       for (const c of [BLACK, WHITE]) {
@@ -658,9 +799,9 @@ async function handle(ws, m) {
 
     case 'play': {
       const room = rooms.get(ws.room); if (!room) return;
-      const c = seatOf(room, ws); if (!c) return send(ws, { t: 'error', msg: 'คุณเป็นผู้ชม' });
+      const c = seatOf(room, ws); if (!c) return sendErr(ws, 'spectator');
       const r = doPlay(room, c, m.x | 0, m.y | 0);
-      if (r.error) send(ws, { t: 'error', msg: r.error });
+      if (r.error) sendErr(ws, r.error);
       return;
     }
 
@@ -668,7 +809,7 @@ async function handle(ws, m) {
       const room = rooms.get(ws.room); if (!room) return;
       const c = seatOf(room, ws); if (!c) return;
       const r = doPass(room, c);
-      if (r.error) send(ws, { t: 'error', msg: r.error });
+      if (r.error) sendErr(ws, r.error);
       return;
     }
 
@@ -723,7 +864,7 @@ async function handle(ws, m) {
 
     /* ---- หน้าเบื้องหลัง ---- */
     case 'director_auth': {
-      if (m.token !== DIRECTOR_TOKEN) return send(ws, { t: 'error', msg: 'รหัสผู้กำกับไม่ถูกต้อง' });
+      if (m.token !== DIRECTOR_TOKEN) return sendErr(ws, 'bad_director_token');
       directors.add(ws);
       send(ws, { t: 'director_ok', program: programRoom });
       return;
@@ -734,15 +875,18 @@ async function handle(ws, m) {
       liveViewers.add(ws);
       // โหมดอัตโนมัติ: ใช้ตอนถ่ายทอดด้วยมือถือเครื่องเดียว ไม่มีคนคุมหน้าเบื้องหลัง
       if (m.auto) { autoProgram = true; autoPickRoom(); }
+      if (m.lang) mc.setLang(m.lang);
       send(ws, { t: 'program', code: programRoom, auto: autoProgram });
+      send(ws, { t: 'mc_info', lang: mc.lang, auto: mcAuto, hasAI: mc.hasAI });
       const room = programRoom && rooms.get(programRoom);
       if (room) send(ws, { t: 'state', ...publicState(room) });
+      mcSpeak('idle', {}, true);
       return;
     }
 
     /* ---- ผู้กำกับขอรับภาพหลายห้องพร้อมกัน (ไม่นั่งเป็นผู้เล่น) ---- */
     case 'watch': {
-      if (!directors.has(ws)) return send(ws, { t: 'error', msg: 'ไม่มีสิทธิ์' });
+      if (!directors.has(ws)) return sendErr(ws, 'no_permission');
       ws.watching = new Set((m.codes || []).map(c => String(c).toUpperCase()));
       for (const code of ws.watching) {
         const room = rooms.get(code);
@@ -754,7 +898,7 @@ async function handle(ws, m) {
     /* ---- เข้าชมอย่างเดียว ไม่นั่งที่ผู้เล่นแม้ที่ว่าง ---- */
     case 'spectate': {
       const room = rooms.get((m.code || '').toUpperCase());
-      if (!room) return send(ws, { t: 'error', msg: 'ไม่พบห้องนี้' });
+      if (!room) return sendErr(ws, 'no_room');
       const prev = ws.room && rooms.get(ws.room);
       if (prev) prev.spectators.delete(ws);
       room.spectators.add(ws); ws.room = room.code;
@@ -765,7 +909,7 @@ async function handle(ws, m) {
 
     /* ---- ผู้กำกับยิงคัตซีนค่ายกล / ข้อความ MC ขึ้นภาพออกอากาศ ---- */
     case 'highlight': {
-      if (!directors.has(ws)) return send(ws, { t: 'error', msg: 'ไม่มีสิทธิ์' });
+      if (!directors.has(ws)) return sendErr(ws, 'no_permission');
       const payload = {
         t: 'highlight',
         nameTh: String(m.nameTh || 'ค่ายกล').slice(0, 40),
@@ -774,18 +918,34 @@ async function handle(ws, m) {
         coords: Array.isArray(m.coords) ? m.coords.slice(0, 40) : [],
       };
       for (const v of liveViewers) send(v, payload);
+      mcSpeak('cut', { pattern: payload.nameTh + (payload.nameJa ? ' / ' + payload.nameJa : '') }, true);
       return;
     }
 
     case 'mc': {
-      if (!directors.has(ws)) return send(ws, { t: 'error', msg: 'ไม่มีสิทธิ์' });
+      if (!directors.has(ws)) return sendErr(ws, 'no_permission');
       const payload = { t: 'mc', text: String(m.text || '').slice(0, 200) };
       for (const v of liveViewers) send(v, payload);
       return;
     }
 
+    case 'mc_lang': {
+      if (!directors.has(ws)) return sendErr(ws, 'no_permission');
+      mc.setLang(m.lang);
+      for (const d of directors) send(d, { t: 'mc_lang', lang: mc.lang });
+      mcSpeak('idle', {}, true);
+      return;
+    }
+
+    case 'mc_auto': {
+      if (!directors.has(ws)) return sendErr(ws, 'no_permission');
+      mcAuto = m.value !== false;
+      for (const d of directors) send(d, { t: 'mc_auto', value: mcAuto, hasAI: mc.hasAI });
+      return;
+    }
+
     case 'auto': {
-      if (!directors.has(ws)) return send(ws, { t: 'error', msg: 'ไม่มีสิทธิ์' });
+      if (!directors.has(ws)) return sendErr(ws, 'no_permission');
       autoProgram = m.value !== false;
       lastAutoSwitch = 0;
       autoPickRoom();
@@ -794,25 +954,35 @@ async function handle(ws, m) {
     }
 
     case 'program': {
-      if (!directors.has(ws)) return send(ws, { t: 'error', msg: 'ไม่มีสิทธิ์' });
+      if (!directors.has(ws)) return sendErr(ws, 'no_permission');
       autoProgram = false;        // ผู้กำกับสั่งเอง = ปิดโหมดอัตโนมัติ
       if (!m.code) { setProgram(null, m.transition || 'fade'); return; }   // จอดำ
       const room = rooms.get(String(m.code).toUpperCase());
-      if (!room) return send(ws, { t: 'error', msg: 'ไม่พบห้องนี้' });
+      if (!room) return sendErr(ws, 'no_room');
       setProgram(room.code, m.transition || 'ink');
       return;
     }
 
     default:
-      send(ws, { t: 'error', msg: 'คำสั่งไม่ถูกต้อง' });
+      sendErr(ws, 'bad_command');
   }
 }
 
+async function boot() {
+  await SETTINGS.load();
+  mcSetConfig(SETTINGS.state.mc);
+  if (SETTINGS.state.mc.lang) mc.setLang(SETTINGS.state.mc.lang);
+  const n = Object.keys(SETTINGS.state.audio).length;
+  console.log(`การตั้งค่า: ${SETTINGS.DB_ON ? 'อ่านจาก Supabase' : 'โหมดหน่วยความจำ'} · ไฟล์เสียง ${n} ช่อง`
+            + ` · MC ${mcSummary().groqKeySet ? 'Groq' : mcSummary().orKeySet ? 'OpenRouter' : 'คำพากย์สำรอง'}`);
+}
+
 if (require.main === module) {
+  boot();
   server.listen(PORT, () => {
     console.log(`Go Battle Live — พร้อมใช้งานที่พอร์ต ${PORT}`);
     console.log(`ฐานข้อมูล Supabase: ${DB_ON ? 'เชื่อมต่อแล้ว' : 'ยังไม่ได้ตั้งค่า (โหมดทดสอบในเครื่อง)'}`);
   });
 }
 
-module.exports = { server, rooms, createRoom, newClock, consume, remainingMs, gorToLabel };
+module.exports = { server, rooms, createRoom, newClock, consume, remainingMs, gorToLabel, boot };

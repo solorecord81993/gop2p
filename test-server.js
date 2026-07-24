@@ -4,6 +4,8 @@
  * ===================================================================== */
 process.env.AI_DELAY_MS   = process.env.AI_DELAY_MS   ?? '0';    // ทดสอบให้เร็ว ไม่ต้องหน่วง
 process.env.AUTO_DWELL_MS = process.env.AUTO_DWELL_MS ?? '600';  // ย่นเวลาค้างห้องตอนทดสอบ
+process.env.MC_MIN_GAP_MS = process.env.MC_MIN_GAP_MS ?? '300';  // ให้ MC พูดถี่ขึ้นตอนทดสอบ
+process.env.MC_IDLE_MS    = process.env.MC_IDLE_MS    ?? '900';
 const WebSocket = require('ws');
 const { server, consume, remainingMs, newClock, gorToLabel } = require('./server.js');
 
@@ -33,6 +35,17 @@ class Client {
       const t0 = Date.now();
       const iv = setInterval(() => {
         const i = this.inbox.findIndex(m => m.t === type);
+        if (i >= 0) { clearInterval(iv); res(this.inbox.splice(i, 1)[0]); }
+        else if (Date.now() - t0 > timeout) { clearInterval(iv); rej(new Error('หมดเวลารอ ' + type)); }
+      }, 10);
+    });
+  }
+  // รอข้อความชนิดที่ต้องการซึ่งตรงเงื่อนไขเพิ่มเติม (เช่น MC หลายข้อความปนกัน)
+  waitWhere(type, pred, timeout = 4000) {
+    return new Promise((res, rej) => {
+      const t0 = Date.now();
+      const iv = setInterval(() => {
+        const i = this.inbox.findIndex(m => m.t === type && pred(m));
         if (i >= 0) { clearInterval(iv); res(this.inbox.splice(i, 1)[0]); }
         else if (Date.now() - t0 > timeout) { clearInterval(iv); rej(new Error('หมดเวลารอ ' + type)); }
       }, 10);
@@ -110,7 +123,7 @@ async function testFlow(port) {
   // ยังไม่กดพร้อม ต้องเดินไม่ได้
   A.send({ t: 'play', x: 2, y: 2 });
   const e1 = await A.wait('error');
-  ok('ยังไม่กดพร้อม เดินไม่ได้', e1.msg.includes('ยังไม่เริ่ม'));
+  ok('ยังไม่กดพร้อม เดินไม่ได้', e1.code === 'not_started', e1.code);
 
   A.send({ t: 'ready', value: true });
   B.send({ t: 'ready', value: true });
@@ -120,7 +133,7 @@ async function testFlow(port) {
   // ดำเดินก่อน
   B.send({ t: 'play', x: 4, y: 4 });
   const e2 = await B.wait('error');
-  ok('เดินผิดตาไม่ได้', e2.msg.includes('ยังไม่ถึงตา'));
+  ok('เดินผิดตาไม่ได้', e2.code === 'not_your_turn', e2.code);
 
   A.send({ t: 'play', x: 2, y: 2 });
   await A.waitState(s => s.game.moveCount === 1);
@@ -128,7 +141,7 @@ async function testFlow(port) {
 
   B.send({ t: 'play', x: 2, y: 2 });
   const e3 = await B.wait('error');
-  ok('วางทับหมากเดิมไม่ได้', e3.msg.includes('มีหมากอยู่แล้ว'));
+  ok('วางทับหมากเดิมไม่ได้', e3.code === 'occupied', e3.code);
 
   // มุมซ้ายบน: ขาววาง (0,0) แล้วดำจับกิน
   B.send({ t: 'play', x: 0, y: 0 });
@@ -298,7 +311,7 @@ async function testDirector(port) {
   D.send({ t: 'auth', name: 'ผู้กำกับ' }); await D.wait('welcome');
   D.send({ t: 'director_auth', token: 'ผิดแน่นอน' });
   const err = await D.wait('error');
-  ok('รหัสผู้กำกับผิด เข้าไม่ได้', err.msg.includes('ไม่ถูกต้อง'));
+  ok('รหัสผู้กำกับผิด เข้าไม่ได้', err.code === 'bad_director_token', err.code);
 
   D.send({ t: 'director_auth', token: 'dev-director' });
   await D.wait('director_ok');
@@ -331,7 +344,7 @@ async function testRules(port) {
   ok('คนที่สามเข้าห้องเต็มกลายเป็นผู้ชม', sj.spectator === true && sj.color === null);
   S.send({ t: 'play', x: 0, y: 0 });
   const se = await S.wait('error');
-  ok('ผู้ชมเดินหมากไม่ได้', se.msg.includes('ผู้ชม'));
+  ok('ผู้ชมเดินหมากไม่ได้', se.code === 'spectator', se.code);
 
   A.send({ t: 'ready' }); B.send({ t: 'ready' });
   await A.waitState(s => s.state === 'playing');
@@ -357,7 +370,7 @@ async function testRules(port) {
      'เชลย=' + koState.game.prisoners.black + ' koPoint=' + koState.game.koPoint);
   B.send({ t:'play', x:1, y:1 });
   const koErr = await B.wait('error');
-  ok('ขาวกินคืนทันทีไม่ได้ (ติดโคะ)', koErr.msg.includes('โคะ'), koErr.msg);
+  ok('ขาวกินคืนทันทีไม่ได้ (ติดโคะ)', koErr.code === 'ko', koErr.code);
 
   // ฆ่าตัวตาย: ขาวไปเล่นที่อื่นก่อนหนึ่งตา แล้วดำ... ทดสอบตรง ๆ ที่มุม
   B.send({ t:'play', x:0, y:8 }); n++; await B.waitState(s => s.game.moveCount === n);
@@ -372,7 +385,7 @@ async function testRules(port) {
   B.send({ t:'play', x:4, y:0 }); n++; await B.waitState(s => s.game.moveCount === n);
   A.send({ t:'play', x:8, y:0 });
   const sui = await A.wait('error');
-  ok('ห้ามวางฆ่าตัวตาย', sui.msg.includes('ฆ่าตัวตาย'), sui.msg);
+  ok('ห้ามวางฆ่าตัวตาย', sui.code === 'suicide', sui.code);
 
   // อีโมจิต้องถึงทุกคนรวมผู้ชม
   A.send({ t:'emoji', id:'clap' });
@@ -476,7 +489,8 @@ async function testWatchAndFiles(port) {
   ok('คำสั่ง spectate เข้าเป็นผู้ชมแม้ที่นั่งว่าง', sj.spectator === true && sj.color === null);
 
   // ไฟล์หน้าเว็บ
-  for (const [path, must] of [['/', 'Go Battle Live'], ['/director.html', 'PROGRAM'], ['/go-engine.js', 'class GoGame']]) {
+  for (const [path, must] of [['/', 'Go Battle Live'], ['/director.html', 'dir.program'],
+                              ['/go-engine.js', 'class GoGame'], ['/i18n.js', 'LANG_NAMES']]) {
     const r = await fetch(`http://127.0.0.1:${port}${path}`);
     const body = await r.text();
     ok(`เสิร์ฟไฟล์ ${path} ได้`, r.status === 200 && body.includes(must));
@@ -542,8 +556,8 @@ async function testLive(port) {
   ok('ผู้กำกับยิงคัตซีนขึ้นภาพออกอากาศได้', hl.nameTh === 'ค่ายกลย้อนศร' && hl.tier === 'SSR');
 
   D.send({ t:'mc', text:'ตานี้ตัดสินเกมเลยครับ' });
-  const mc = await L.wait('mc');
-  ok('ส่งข้อความ MC ขึ้นภาพได้', mc.text === 'ตานี้ตัดสินเกมเลยครับ');
+  const mc = await L.waitWhere('mc', m => m.text === 'ตานี้ตัดสินเกมเลยครับ');
+  ok('ผู้กำกับส่งข้อความ MC เองได้', mc.text === 'ตานี้ตัดสินเกมเลยครับ');
 
   // ผู้เล่นต้องไม่เห็นคัตซีน (เห็นเฉพาะบนไลฟ์)
   B.inbox.length = 0;
@@ -554,7 +568,7 @@ async function testLive(port) {
   // คนที่ไม่ใช่ผู้กำกับยิงคัตซีนไม่ได้
   A.send({ t:'highlight', nameTh:'โกง', tier:'SSR' });
   const e = await A.wait('error');
-  ok('คนทั่วไปยิงคัตซีนไม่ได้', e.msg.includes('ไม่มีสิทธิ์'));
+  ok('คนทั่วไปยิงคัตซีนไม่ได้', e.code === 'no_permission', e.code);
 
   const html = await fetch(`http://127.0.0.1:${port}/live`).then(r => r.text());
   ok('เสิร์ฟ /live ได้ และเป็นภาพแนวตั้ง 1080×1920',
@@ -621,6 +635,171 @@ async function testAutoBroadcast(port) {
   A.close(); B.close(); D.close(); L.close();
 }
 
+
+/* =====================================================================
+ * ทดสอบ: MC พากย์อัตโนมัติ (ไม่มีคีย์ AI ต้องใช้คำสำรองและไม่เงียบ)
+ * ===================================================================== */
+async function testMC(port) {
+  console.log('\n[13] MC พากย์อัตโนมัติ');
+  const D = new Client(port), L = new Client(port), A = new Client(port), B = new Client(port);
+  await Promise.all([D.ready, L.ready, A.ready, B.ready]);
+  for (const [c, n] of [[D,'ผู้กำกับ'],[L,'ภาพออกอากาศ'],[A,'ก'],[B,'ข']]) c.send({ t:'auth', name:n });
+  await Promise.all([D.wait('welcome'), L.wait('welcome'), A.wait('welcome'), B.wait('welcome')]);
+
+  A.send({ t:'create', size:9, timeRule:{ main:300, byoyomi:30, periods:3 } });
+  const r = await A.wait('joined');
+  B.send({ t:'join', code:r.code }); await B.wait('joined');
+
+  D.send({ t:'director_auth', token:'dev-director' }); await D.wait('director_ok');
+  L.send({ t:'live', lang:'th' });
+  const info = await L.wait('mc_info');
+  ok('หน้าไลฟ์รู้สถานะ MC ตอนเชื่อมต่อ', info.lang === 'th' && info.auto === true);
+  ok('ไม่มีคีย์ AI ระบบก็ยังทำงาน', typeof info.hasAI === 'boolean');
+
+  const first = await L.wait('mc', 4000);
+  ok('MC พูดทันทีเมื่อเปิดหน้าไลฟ์', !!first.text && first.text.length > 3, first.text);
+  ok('ไม่มีคีย์ AI จึงใช้คำพากย์สำรอง', first.source === 'canned', first.source);
+
+  // สลับห้องขึ้นภาพแล้ว MC ต้องพูดถึงห้องนั้น
+  D.send({ t:'program', code:r.code }); await D.wait('program');
+  const onAir = await L.wait('mc', 4000);
+  ok('MC พูดตอนสลับห้องขึ้นภาพ', !!onAir.text, onAir.text);
+
+  // เดินหมากแล้วต้องมีพากย์ตามมา
+  A.send({ t:'ready' }); B.send({ t:'ready' });
+  await A.waitState(s => s.state === 'playing');
+  L.inbox.length = 0;
+  const said = new Set();
+  for (let i = 0; i < 6; i++) {
+    const c = i % 2 === 0 ? A : B;
+    c.send({ t:'play', x:i, y:i });
+    await sleep(1400);
+    for (const m of L.inbox.filter(m => m.t === 'mc')) said.add(m.text);
+  }
+  ok('MC พูดต่อเนื่องระหว่างเดินหมาก', said.size >= 1, 'ได้ ' + said.size + ' ประโยค');
+  ok('พูดไม่ซ้ำประโยคเดิมติดกัน', said.size === new Set([...said]).size);
+
+  // เปลี่ยนภาษา MC
+  D.send({ t:'mc_lang', lang:'ja' });
+  const jl = await D.wait('mc_lang');
+  ok('ผู้กำกับเปลี่ยนภาษา MC เป็นญี่ปุ่นได้', jl.lang === 'ja');
+  const jaLine = await L.waitWhere('mc', m => m.lang === 'ja', 4000);
+  ok('ประโยคที่ได้เป็นภาษาญี่ปุ่นจริง', /[\u3040-\u30FF\u4E00-\u9FFF]/.test(jaLine.text), jaLine.text);
+
+  D.send({ t:'mc_lang', lang:'en' });
+  await D.wait('mc_lang');
+  const enLine = await L.waitWhere('mc', m => m.lang === 'en', 4000);
+  ok('เปลี่ยนเป็นอังกฤษได้และไม่มีอักษรไทยปน',
+     !/[\u0E00-\u0E7F]/.test(enLine.text), enLine.text);
+
+  // ปิดพากย์อัตโนมัติ
+  D.send({ t:'mc_auto', value:false });
+  const off = await D.wait('mc_auto');
+  ok('ปิดพากย์อัตโนมัติได้', off.value === false);
+  L.inbox.length = 0;
+  A.send({ t:'play', x:7, y:7 });
+  await sleep(1200);
+  ok('ปิดแล้วไม่พากย์อีก', !L.inbox.some(m => m.t === 'mc'));
+  D.send({ t:'mc_auto', value:true }); await D.wait('mc_auto');
+  D.send({ t:'mc_lang', lang:'th' }); await D.wait('mc_lang');
+
+  A.close(); B.close(); D.close(); L.close();
+}
+
+
+/* =====================================================================
+ * ทดสอบ: หน้าตั้งค่าของผู้กำกับ (คีย์ AI และไฟล์เสียง)
+ * ===================================================================== */
+async function testSettings(port) {
+  console.log('\n[14] หน้าตั้งค่า — คีย์ AI และไฟล์เสียง');
+  const base = `http://127.0.0.1:${port}`;
+  const TOK = { 'x-director-token': 'dev-director' };
+
+  // ต้องมีรหัสผู้กำกับเท่านั้น
+  const noAuth = await fetch(`${base}/api/settings`).then(r => r.status);
+  ok('เข้าหน้าตั้งค่าโดยไม่มีรหัสไม่ได้', noAuth === 403, String(noAuth));
+
+  const s = await fetch(`${base}/api/settings`, { headers: TOK }).then(r => r.json());
+  ok('อ่านการตั้งค่าได้เมื่อมีรหัส', !!s.mc && Array.isArray(s.slots));
+  ok('ไม่ส่งคีย์จริงกลับมาให้เบราว์เซอร์', !('groqKey' in s.mc) && !('orKey' in s.mc));
+  ok('มีช่องเสียงครบทั้งเพลง เสียงเกม และคัตซีน',
+     s.slots.some(x => x.kind === 'bgm') && s.slots.some(x => x.kind === 'sfx') && s.slots.some(x => x.kind === 'cut'));
+  ok('ระบุชนิดไฟล์ชัดเจนพร้อมบอกว่าอันไหน iOS เล่นไม่ได้',
+     s.audioTypes.some(t => t.label === 'MP3' && t.ios) &&
+     s.audioTypes.some(t => t.label === 'OGG' && !t.ios),
+     s.audioTypes.map(t => t.label).join(','));
+
+  // บันทึกคีย์
+  const save = await fetch(`${base}/api/settings`, {
+    method:'POST', headers:{ ...TOK, 'Content-Type':'application/json' },
+    body: JSON.stringify({ groqKey:'gsk_test_1234ABCD', minGapMs: 5000, lang:'en' }),
+  }).then(r => r.json());
+  ok('บันทึกคีย์ Groq ได้', save.ok === true && save.mc.groqKeySet === true);
+  ok('แสดงคีย์แบบปิดบังเท่านั้น', /^••••/.test(save.mc.groqKeyHint), save.mc.groqKeyHint);
+  ok('ค่าอื่นบันทึกด้วย', save.mc.minGapMs === 5000);
+
+  // ปฏิเสธชนิดไฟล์ที่ไม่รองรับ
+  const badType = await fetch(`${base}/api/audio/sfx_stone`, {
+    method:'PUT', headers:{ ...TOK, 'Content-Type':'image/png' },
+    body: Buffer.alloc(200),
+  }).then(r => r.json());
+  ok('ไฟล์ผิดชนิดถูกปฏิเสธ', !!badType.error, badType.error);
+
+  // ช่องเสียงที่ไม่มีอยู่จริง
+  const badSlot = await fetch(`${base}/api/audio/ไม่มีช่องนี้`, {
+    method:'PUT', headers:{ ...TOK, 'Content-Type':'audio/mpeg' }, body: Buffer.alloc(200),
+  }).then(r => r.status);
+  ok('ช่องเสียงที่ไม่รู้จักถูกปฏิเสธ', badSlot === 400, String(badSlot));
+
+  // อัปโหลดไฟล์จริง (MP3 จำลอง)
+  const fakeMp3 = Buffer.concat([Buffer.from([0xFF, 0xFB, 0x90, 0x00]), Buffer.alloc(4096, 7)]);
+  const up = await fetch(`${base}/api/audio/sfx_stone`, {
+    method:'PUT',
+    headers:{ ...TOK, 'Content-Type':'audio/mpeg', 'x-file-name': encodeURIComponent('stone.mp3') },
+    body: fakeMp3,
+  }).then(r => r.json());
+  ok('อัปโหลดไฟล์เสียงวางหมากได้', up.ok === true);
+  const stone = up.audio.assets.find(a => a.id === 'sfx_stone');
+  ok('รายการไฟล์บันทึกชนิดและขนาดถูกต้อง', stone.ext === 'mp3' && stone.size === fakeMp3.length, JSON.stringify(stone));
+
+  // ไฟล์ใหญ่เกินกำหนดของช่องนั้น
+  const tooBig = await fetch(`${base}/api/audio/sfx_capture`, {
+    method:'PUT', headers:{ ...TOK, 'Content-Type':'audio/wav' },
+    body: Buffer.alloc(1024 * 1024 * 2, 1),
+  }).then(r => r.json());
+  ok('ไฟล์ใหญ่เกินโควตาของช่องถูกปฏิเสธ', !!tooBig.error, tooBig.error);
+
+  // ทุกเครื่องต้องได้รับรายการไฟล์ใหม่
+  const C = new Client(port); await C.ready;
+  C.send({ t:'auth', name:'ก' });
+  await C.wait('welcome');
+  const mf0 = await C.wait('manifest');
+  ok('ผู้เล่นได้รับรายการไฟล์เสียงตอนเชื่อมต่อ', Array.isArray(mf0.assets));
+  ok('รายการมีไฟล์ที่เพิ่งอัปโหลด', mf0.assets.some(a => a.id === 'sfx_stone' && a.url));
+
+  C.inbox.length = 0;
+  await fetch(`${base}/api/audio/sfx_pass`, {
+    method:'PUT', headers:{ ...TOK, 'Content-Type':'audio/mp4' }, body: Buffer.alloc(3000, 3),
+  });
+  const mf1 = await C.wait('manifest', 3000);
+  ok('อัปโหลดใหม่แล้วทุกเครื่องได้รับรายการใหม่ทันที',
+     mf1.assets.some(a => a.id === 'sfx_pass' && a.url));
+
+  // โหลดไฟล์ที่เก็บในหน่วยความจำได้จริง
+  const got = await fetch(`${base}/api/audio/sfx_stone`);
+  ok('ดาวน์โหลดไฟล์เสียงกลับมาได้', got.status === 200 && got.headers.get('content-type').includes('audio'));
+
+  // ลบไฟล์
+  const del = await fetch(`${base}/api/audio/sfx_stone`, { method:'DELETE', headers: TOK }).then(r => r.json());
+  ok('ลบไฟล์เสียงได้', del.ok === true && !del.audio.assets.find(a => a.id === 'sfx_stone').url);
+
+  // รายการไฟล์เปิดให้ทุกคนอ่านได้โดยไม่ต้องมีรหัส
+  const pub = await fetch(`${base}/api/manifest`).then(r => r.json());
+  ok('รายการไฟล์เสียงเปิดสาธารณะให้เบราว์เซอร์โหลดล่วงหน้าได้', Array.isArray(pub.assets));
+
+  C.close();
+}
+
 /* ===================================================================== */
 (async () => {
   await new Promise(res => server.listen(0, res));
@@ -630,6 +809,7 @@ async function testAutoBroadcast(port) {
   testClock();
   try {
     await testAutoBroadcast(port);
+    await testMC(port);
     await testFlow(port);
     await testResume(port);
     await testAI(port);
@@ -640,6 +820,7 @@ async function testAutoBroadcast(port) {
     await testAIFullGame(port);
     await testWatchAndFiles(port);
     await testLive(port);
+    await testSettings(port);
   } catch (e) {
     fail++; console.log('  FAIL การทดสอบหยุดกลางคัน → ' + e.message);
   }

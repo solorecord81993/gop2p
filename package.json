@@ -6,7 +6,7 @@
   "engines": { "node": ">=20" },
   "scripts": {
     "start": "node server.js",
-    "test": "node test.js && node test-server.js"
+    "test": "node test.js && node test-i18n.js && node test-ui.js && node test-server.js"
   },
   "dependencies": { "ws": "^8.18.0" },
   "license": "MIT"

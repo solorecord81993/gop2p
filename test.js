@@ -10,7 +10,7 @@ t('จับกินมุมได้', g.get(0,0)===EMPTY && g.prisoners[BLAC
 // 2 ห้ามฆ่าตัวตาย
 g=new GoGame({size:9});
 g.board[g.idx(1,0)]=BLACK; g.board[g.idx(0,1)]=BLACK; g.turn=WHITE;
-t('ห้ามฆ่าตัวตาย', g.illegalReason(0,0,WHITE)==='ห้ามวางฆ่าตัวตาย');
+t('ห้ามฆ่าตัวตาย', g.illegalReason(0,0,WHITE)==='suicide');
 g.board[g.idx(2,0)]=WHITE; g.board[g.idx(0,2)]=WHITE; g.board[g.idx(1,1)]=WHITE;
 t('วางแล้วกินได้ ไม่ถือเป็นฆ่าตัวตาย', g.illegalReason(0,0,WHITE)===null);
 
@@ -21,7 +21,7 @@ setup.forEach(([x,y,c])=>{g.board[g.idx(x,y)]=c;});
 g.turn=WHITE;
 const r=g.play(1,1,WHITE);
 t('กินโคะแล้วเกิดจุดห้ามกินคืน', r.ok && g.koPoint===g.idx(2,1));
-t('กินคืนทันทีไม่ได้', g.illegalReason(2,1,BLACK)==='ติดโคะ — กินคืนทันทีไม่ได้');
+t('กินคืนทันทีไม่ได้ (รหัส ko)', g.illegalReason(2,1,BLACK)==='ko');
 
 // 4 นับแต้มญี่ปุ่น: กระดาน 9x9 ดำยึดครึ่งซ้าย ขาวครึ่งขวา
 g=new GoGame({size:9,komi:1.5});
