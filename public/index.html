@@ -292,12 +292,15 @@ canvas{width:100%; height:auto; display:block; border-radius:12px; touch-action:
  *  anon key เปิดเผยได้ ปลอดภัยเพราะมี RLS คุมอยู่แล้ว
  * ═══════════════════════════════════════════════════════════ */
 const CONFIG = {
+  // ห้ามใส่เครื่องหมาย / ปิดท้าย URL
   SUPABASE_URL: 'https://msllwhkdppprymojhcwv.supabase.co',
+  // anon key เปิดเผยได้ ปลอดภัยเพราะมี RLS คุมอยู่
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zbGx3aGtkcHBwcnltb2poY3d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4Mzc5MzksImV4cCI6MjEwMDQxMzkzOX0.KgVRMgkIlStIrfdM6yjRmaev0PJi7Mp1bZejJqMmOSc',
   SERVER_URL: location.origin.replace(/^http/, 'ws'),
 };
 
-const hasSB = !CONFIG.SUPABASE_URL.includes('YOUR-PROJECT');
+const hasSB = /^https:\/\/[a-z0-9]+\.supabase\.co$/.test(CONFIG.SUPABASE_URL)
+           && CONFIG.SUPABASE_ANON_KEY.split('.').length === 3;
 const sb = hasSB ? supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
 const { GoGame } = window.GoEngine;
 
