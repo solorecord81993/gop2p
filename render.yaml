@@ -4,7 +4,7 @@ services:
     name: go-battle-live
     runtime: node
     plan: starter          # ห้ามใช้ free — WebSocket จะขาดทุกครั้งที่เครื่องหลับ
-    buildCommand: npm ci --omit=dev
+    buildCommand: npm install --omit=dev
     startCommand: node server.js
     healthCheckPath: /healthz
     envVars:

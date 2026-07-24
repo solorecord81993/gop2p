@@ -51,15 +51,9 @@ npm start       # เปิด http://localhost:3000
 
 ### 3. ใส่ค่า Supabase ในหน้าเว็บ
 
-แก้ `public/index.html` ตรงหัวข้อ `CONFIG` ประมาณกลางไฟล์
-
-```js
-const CONFIG = {
-  SUPABASE_URL: 'https://xxxxxxxx.supabase.co',
-  SUPABASE_ANON_KEY: 'eyJhbGciOi...',
-  SERVER_URL: location.origin.replace(/^http/, 'ws'),
-};
-```
+**ใส่ให้แล้วในไฟล์ `public/index.html`** — ทั้ง Project URL และ anon key
+ถ้าเปลี่ยนโปรเจกต์ในอนาคต ให้แก้ตรงหัวข้อ `CONFIG` ประมาณกลางไฟล์
+โดย **URL ต้องไม่มีเครื่องหมาย `/` ปิดท้าย** ไม่งั้น supabase-js จะต่อ path ผิด
 
 ### 4. ดีพลอยเซิร์ฟเวอร์บน Render
 
@@ -67,7 +61,7 @@ const CONFIG = {
 2. Render → **New → Web Service** → เลือก repo นี้
 3. ตั้งค่า
    - Runtime: **Node**
-   - Build Command: `npm ci --omit=dev`
+   - Build Command: `npm install --omit=dev`
    - Start Command: `node server.js`
    - Health Check Path: `/healthz`
    - **Instance Type: Starter ($7/เดือน)**
@@ -234,6 +228,23 @@ node test-server.js   72 ข้อ  — นาฬิกา, เล่นจน�
 4. AI ระดับดั้งด้วย KataGo Human SL บนเครื่องแยก
 5. `db.html` หน้าสถิติและตารางอันดับ
 6. อัปโหลดไฟล์เพลงและเสียงจริงเข้า Supabase Storage แทนเสียงสังเคราะห์
+
+---
+
+## ถ้าดีพลอยแล้ว build ไม่ผ่าน
+
+**`npm error ... Run "npm help ci" for more info` แล้ว Build failed**
+เกิดจากคำสั่ง `npm ci` ที่ต้องมีไฟล์ `package-lock.json` อยู่ใน repo เสมอ ถ้าไม่มีจะพังทันที
+แก้ได้ 2 ทาง เลือกทางใดทางหนึ่ง
+
+1. **เปลี่ยนคำสั่ง build** (ทำไว้ให้แล้วใน `render.yaml`)
+   Render → Settings → Build Command → `npm install --omit=dev`
+   คำสั่งนี้สร้าง lockfile เองได้ จึงไม่ต้องมีไฟล์นั้นใน repo
+2. หรือ **commit `package-lock.json` ขึ้น repo** แล้วใช้ `npm ci --omit=dev` ต่อไปได้
+   (แนะนำในระยะยาว เพราะล็อกเวอร์ชันไลบรารีไว้ไม่ให้เปลี่ยนเอง)
+
+> ถ้าแก้ใน `render.yaml` อย่างเดียวแล้วยังพัง ให้ไปแก้ที่ Render → Settings → Build Command ด้วย
+> เพราะค่าที่ตั้งไว้ในหน้าเว็บ Render จะทับค่าจากไฟล์
 
 ---
 
