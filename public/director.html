@@ -6,6 +6,7 @@
 <title>ห้องคอนโทรล — Go Battle Live</title>
 <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500&display=swap" rel="stylesheet">
 <script src="/go-engine.js"></script>
+<script src="/i18n.js"></script>
 <style>
 :root{--sumi:#161311;--sumi-2:#211C18;--sumi-3:#2C2621;--line:#3A322B;
       --kaya:#E2B565;--shell:#F6F2E7;--shu:#C2372E;--matcha:#7E9468;--muted:#9A8E82}
@@ -51,13 +52,13 @@ button:disabled{opacity:.35;cursor:not-allowed}
 
 <!-- เข้าสู่ระบบผู้กำกับ -->
 <section id="gate">
-  <h1 style="font-size:1.3rem;margin-bottom:6px">ห้องคอนโทรล</h1>
-  <div class="hint" style="margin-bottom:16px">สลับห้องที่จะขึ้นถ่ายทอดสดบน TikTok</div>
+  <h1 style="font-size:1.3rem;margin-bottom:6px" data-i18n="dir.title"></h1>
+  <div class="hint" style="margin-bottom:16px" data-i18n="dir.subtitle"></div>
   <div class="card" style="max-width:400px">
-    <div class="hint" style="margin-bottom:8px">รหัสผู้กำกับ</div>
+    <div class="hint" style="margin-bottom:8px" data-i18n="dir.token"></div>
     <input id="tok" type="password" placeholder="DIRECTOR_TOKEN">
     <div style="height:12px"></div>
-    <button class="btn-take" style="width:100%" id="btnEnter">เข้าห้องคอนโทรล</button>
+    <button class="btn-take" style="width:100%" id="btnEnter" data-i18n="dir.enter"></button>
     <div class="hint" id="gateErr" style="color:#E8877E;margin-top:10px"></div>
   </div>
 </section>
@@ -65,69 +66,141 @@ button:disabled{opacity:.35;cursor:not-allowed}
 <!-- หน้าคอนโทรล -->
 <section id="panel" class="hidden">
   <div class="row" style="margin-bottom:14px">
-    <h1 class="grow" style="font-size:1.2rem">ห้องคอนโทรล</h1>
+    <h1 class="grow" style="font-size:1.2rem" data-i18n="dir.title"></h1>
+    <select id="mcLang" style="background:var(--sumi-3);border:1px solid var(--line);color:var(--shell);
+        border-radius:9px;padding:7px 10px;font:inherit;font-size:.8rem;width:auto">
+      <option value="th">ไทย</option><option value="en">English</option><option value="ja">日本語</option>
+    </select>
+    <label class="sw" style="font-size:.8rem"><input type="checkbox" id="mcAuto" checked style="width:auto"> <span data-i18n="dir.mcAuto"></span></label>
     <span class="tag" id="clock">—</span>
-    <span class="tag">ห้องทั้งหมด <b id="nRooms">0</b></span>
-    <a class="tag" href="/live.html" target="_blank" style="color:var(--kaya)">เปิดภาพออกอากาศ ↗</a>
+    <span class="tag"><span data-i18n="dir.allRooms"></span> <b id="nRooms">0</b></span>
+    <button id="btnSettings" style="padding:7px 12px;font-size:.8rem" data-i18n="set.open"></button>
+    <a class="tag" id="lnkLive" href="/live.html" target="_blank" style="color:var(--kaya)" data-i18n="dir.openLive"></a>
   </div>
 
   <div class="decks">
     <div class="deck program">
-      <h3>PROGRAM · กำลังออกอากาศ</h3>
+      <h3 data-i18n="dir.program"></h3>
       <canvas id="cvProgram" width="380" height="380"></canvas>
-      <div class="meta"><span id="pgTitle">— ไม่มีห้อง —</span><span id="pgInfo"></span></div>
+      <div class="meta"><span id="pgTitle"></span><span id="pgInfo"></span></div>
     </div>
     <div class="deck preview">
-      <h3>PREVIEW · เตรียมไว้</h3>
+      <h3 data-i18n="dir.preview"></h3>
       <canvas id="cvPreview" width="380" height="380"></canvas>
-      <div class="meta"><span id="pvTitle">— ยังไม่ได้เลือก —</span><span id="pvInfo"></span></div>
+      <div class="meta"><span id="pvTitle"></span><span id="pvInfo"></span></div>
     </div>
   </div>
 
   <div class="row" style="margin:16px 0;justify-content:center;flex-wrap:wrap">
-    <button class="btn-take" id="btnTake" disabled>▶ TAKE — ส่งขึ้นไลฟ์</button>
-    <button id="btnBlack">จอดำ</button>
-    <label class="sw"><input type="checkbox" id="autoMode" style="width:auto"> สลับอัตโนมัติตามความมัน</label>
-    <span class="hint">ทำงานที่เซิร์ฟเวอร์ ค้างห้องละอย่างน้อย 30 วินาที · ปิดเครื่องนี้แล้วยังทำงานต่อ</span>
+    <button class="btn-take" id="btnTake" disabled data-i18n="dir.take"></button>
+    <button id="btnBlack" data-i18n="dir.black"></button>
+    <label class="sw"><input type="checkbox" id="autoMode" style="width:auto"> <span data-i18n="dir.auto"></span></label>
+    <span class="hint" data-i18n="dir.autoNote"></span>
   </div>
 
   <div class="card" style="margin-bottom:16px">
     <div class="row" style="flex-wrap:wrap">
       <div style="min-width:220px" class="grow">
-        <div class="hint" style="margin-bottom:6px">ข้อความ MC (ขึ้นบนภาพออกอากาศ)</div>
+        <div class="hint" style="margin-bottom:6px" data-i18n="dir.mcLabel"></div>
         <div class="row">
-          <input id="mcText" class="grow" placeholder="เช่น ตานี้ตัดสินเกมเลยครับ">
-          <button id="btnMC">ส่ง</button>
+          <input id="mcText" class="grow" data-i18n-ph="dir.mcPh">
+          <button id="btnMC" data-i18n="dir.send"></button>
         </div>
       </div>
       <div style="min-width:260px">
-        <div class="hint" style="margin-bottom:6px">ยิงคัตซีนค่ายกลด้วยมือ</div>
+        <div class="hint" style="margin-bottom:6px" data-i18n="dir.cutLabel"></div>
         <div class="row">
           <select id="selPattern" class="grow" style="background:var(--sumi-3);border:1px solid var(--line);
                   color:var(--shell);border-radius:10px;padding:12px;font:inherit">
-            <option value="ค่ายกลย้อนศร|ウッテガエシ|SSR">ค่ายกลย้อนศร · SSR</option>
-            <option value="อาตาริคู่|両アタリ|SR">อาตาริคู่ · SR</option>
-            <option value="แทงกลางตา|ナカデ|SSR">แทงกลางตา · SSR</option>
-            <option value="บันได|シチョウ|SR">บันได · SR</option>
-            <option value="ตาข่าย|ゲタ|SR">ตาข่าย · SR</option>
-            <option value="ปนนุกิ|ポン抜き|R">ปนนุกิ · R</option>
-            <option value="เปิดศึกโคะ|コウ|R">เปิดศึกโคะ · R</option>
-            <option value="เซกิ|セキ|SSR">เซกิ · SSR</option>
-          </select>
-          <button id="btnCut">ยิง</button>
+            </select>
+          <button id="btnCut" data-i18n="dir.fire"></button>
         </div>
       </div>
     </div>
-    <div class="hint" style="margin-top:8px">คัตซีนแสดง 3 วินาที เห็นเฉพาะบนภาพออกอากาศ ผู้เล่นไม่เห็นและเกมไม่หยุด</div>
+    <div class="hint" style="margin-top:8px" data-i18n="dir.cutNote"></div>
   </div>
 
-  <h3 style="font-size:.95rem;margin-top:6px">ห้องที่เปิดอยู่</h3>
-  <div class="hint">แตะการ์ดเพื่อส่งเข้า PREVIEW แล้วกด TAKE เพื่อออกอากาศ</div>
+  <h3 style="font-size:.95rem;margin-top:6px" data-i18n="dir.rooms"></h3>
+  <div class="hint" data-i18n="dir.roomsHint"></div>
   <div class="grid" id="grid"></div>
+</section>
+
+<!-- ═══════════ หน้าตั้งค่า ═══════════ -->
+<section id="settings" class="hidden" style="position:fixed;inset:0;background:rgba(10,8,7,.94);
+         overflow:auto;padding:20px;z-index:100">
+  <div style="max-width:760px;margin:0 auto">
+    <div class="row" style="margin-bottom:14px">
+      <h2 class="grow" style="font-size:1.15rem" data-i18n="set.title"></h2>
+      <button id="btnCloseSet" data-i18n="set.close"></button>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <h3 style="font-size:1rem;margin-bottom:6px" data-i18n="set.tabAI"></h3>
+      <div class="hint" style="margin-bottom:12px" data-i18n="set.order"></div>
+
+      <div class="hint" style="margin-bottom:5px"><span data-i18n="set.groqKey"></span> — <span id="groqState"></span></div>
+      <input id="inGroq" type="password" autocomplete="off" placeholder="gsk_...">
+      <div style="height:9px"></div>
+      <div class="hint" style="margin-bottom:5px"><span data-i18n="set.orKey"></span> — <span id="orState"></span></div>
+      <input id="inOR" type="password" autocomplete="off" placeholder="sk-or-...">
+      <div style="height:9px"></div>
+      <div class="hint" style="margin-bottom:5px" data-i18n="set.groqModel"></div>
+      <input id="inGroqModel" autocomplete="off">
+      <div style="height:9px"></div>
+      <div class="hint" style="margin-bottom:5px" data-i18n="set.orModel"></div>
+      <input id="inORModel" autocomplete="off">
+
+      <div class="row" style="margin-top:12px;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:170px">
+          <div class="hint" style="margin-bottom:5px" data-i18n="set.minGap"></div>
+          <input id="inMinGap" type="number" min="1000" step="500">
+        </div>
+        <div style="flex:1;min-width:170px">
+          <div class="hint" style="margin-bottom:5px" data-i18n="set.idleGap"></div>
+          <input id="inIdle" type="number" min="3000" step="1000">
+        </div>
+      </div>
+
+      <div class="hint" style="margin-top:12px" data-i18n="set.keyNote"></div>
+      <div style="height:12px"></div>
+      <button class="btn-take" id="btnSaveAI" data-i18n="set.save"></button>
+      <span class="hint" id="saveState" style="margin-left:10px"></span>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:1rem;margin-bottom:6px" data-i18n="set.tabAudio"></h3>
+      <div class="hint" id="storageNote" style="margin-bottom:8px"></div>
+      <div class="hint" style="margin-bottom:4px"><b><span data-i18n="set.fileTypes"></span>:</b> <span id="typeList"></span></div>
+      <div class="hint" style="color:#E8A87E;margin-bottom:14px" data-i18n="set.iosWarn"></div>
+      <div id="slotList"></div>
+    </div>
+  </div>
 </section>
 
 <script>
 const $ = id => document.getElementById(id);
+const I = window.I18N;
+const LANG_ORDER = ['th','en','ja'];
+let LANG = LANG_ORDER.includes(localStorage.getItem('gb_lang')) ? localStorage.getItem('gb_lang') : 'th';
+const T = (k,v) => (I ? I.T(k,v,LANG) : k);
+const PATTERNS = ['snapback','double_atari','nakade','ladder','net','ponnuki','ko','seki'];
+const TIERS = { snapback:'SSR', double_atari:'SR', nakade:'SSR', ladder:'SR', net:'SR', ponnuki:'R', ko:'R', seki:'SSR' };
+
+function applyLang(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = T(el.dataset.i18n));
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => el.placeholder = T(el.dataset.i18nPh));
+  const sel = $('selPattern');
+  const keep = sel.value;
+  sel.innerHTML = PATTERNS.map(p =>
+    `<option value="${p}">${I ? I.T('pat.'+p, null, 'th') : p} / ${I ? I.T('pat.'+p, null, 'ja') : ''} · ${TIERS[p]}</option>`).join('');
+  if (keep) sel.value = keep;
+  $('lnkLive').href = '/live.html?lang=' + LANG;
+  if (SET) renderSlots();
+  if (!program) $('pgTitle').textContent = T('dir.noRoom');
+  if (!preview) $('pvTitle').textContent = T('dir.notPicked');
+}
+
 const WS_URL = location.origin.replace(/^http/, 'ws');
 const DWELL_MS = 30000;
 
@@ -137,27 +210,31 @@ let lastSwitchAt = 0;
 
 $('btnEnter').onclick = () => {
   token = $('tok').value.trim();
-  if (!token) return $('gateErr').textContent = 'กรุณากรอกรหัสผู้กำกับ';
+  if (!token) return $('gateErr').textContent = T('dir.tokenEmpty');
   connect();
 };
 $('tok').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnEnter').click(); });
+$('mcLang').value = LANG;
+applyLang();
 
 function connect(){
   ws = new WebSocket(WS_URL);
   ws.onopen = () => {
-    ws.send(JSON.stringify({ t:'auth', name:'ผู้กำกับ' }));
+    ws.send(JSON.stringify({ t:'auth', name:'director' }));
     setTimeout(() => ws.send(JSON.stringify({ t:'director_auth', token })), 120);
   };
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if (m.t === 'director_ok'){
       $('gate').classList.add('hidden'); $('panel').classList.remove('hidden');
-      program = m.program; poll(); setInterval(poll, 2000);
+      program = m.program; applyLang(); poll(); setInterval(poll, 2000);
       ws.send(JSON.stringify({ t:'auto', value:false }));   // เปิดหน้านี้ = คุมเอง
     }
-    if (m.t === 'error') $('gateErr').textContent = m.msg;
+    if (m.t === 'error') $('gateErr').textContent = m.code ? T('srv.' + m.code) : m.msg;
     if (m.t === 'program'){ program = m.code; lastSwitchAt = Date.now(); render(); }
     if (m.t === 'auto'){ $('autoMode').checked = !!m.value; }
+    if (m.t === 'mc_lang'){ $('mcLang').value = m.lang; }
+    if (m.t === 'mc_auto'){ $('mcAuto').checked = !!m.value; }
     if (m.t === 'state' || m.t === 'end'){ states.set(m.code, m); render(); }
   };
   ws.onclose = () => setTimeout(connect, 2000);
@@ -168,7 +245,7 @@ async function poll(){
     const r = await fetch('/api/rooms').then(r => r.json());
     rooms = r.rooms; program = r.program;
     $('nRooms').textContent = rooms.length;
-    $('clock').textContent = new Date().toLocaleTimeString('th-TH');
+    $('clock').textContent = new Date().toLocaleTimeString(LANG === 'ja' ? 'ja-JP' : LANG === 'en' ? 'en-US' : 'th-TH');
     syncWatch();
     render();
   } catch {}
@@ -183,6 +260,13 @@ function syncWatch(){
 /* โหมดสลับอัตโนมัติทำงานที่เซิร์ฟเวอร์ ไม่ใช่ที่หน้านี้
    จึงยังทำงานต่อแม้ปิดหน้าเบื้องหลังไปแล้ว — สำคัญมากตอนถ่ายทอดด้วยมือถือ */
 $('autoMode').onchange = () => ws.send(JSON.stringify({ t:'auto', value: $('autoMode').checked }));
+$('mcAuto').onchange   = () => ws.send(JSON.stringify({ t:'mc_auto', value: $('mcAuto').checked }));
+$('mcLang').onchange   = () => {
+  LANG = $('mcLang').value;                       // ภาษาของหน้านี้ตามภาษาที่ให้ MC พูด
+  localStorage.setItem('gb_lang', LANG);
+  applyLang();
+  ws.send(JSON.stringify({ t:'mc_lang', lang: LANG }));
+};
 
 function take(code){
   ws.send(JSON.stringify({ t:'program', code }));
@@ -192,9 +276,122 @@ function take(code){
 $('btnTake').onclick = () => { if (preview) take(preview); };
 
 $('btnBlack').onclick = () => {
-  if (!confirm('ตัดเป็นจอดำ? ภาพออกอากาศจะไม่มีห้องใดขึ้นเลย')) return;
+  if (!confirm(T('dir.blackConfirm'))) return;
   ws.send(JSON.stringify({ t:'program', code:null }));
   program = null; lastSwitchAt = Date.now(); $('autoMode').checked = false; render();
+};
+
+/* ═══════════ หน้าตั้งค่า ═══════════ */
+let SET = null;
+const setHeaders = () => ({ 'x-director-token': token });
+
+$('btnSettings').onclick = async () => {
+  $('settings').classList.remove('hidden');
+  await loadSettings();
+};
+$('btnCloseSet').onclick = () => $('settings').classList.add('hidden');
+
+async function loadSettings(){
+  try {
+    SET = await fetch('/api/settings', { headers: setHeaders() }).then(r => r.json());
+  } catch (e) { return alert(T('set.err', { m: e.message })); }
+  if (SET.error) return alert(T('set.err', { m: SET.error }));
+
+  $('groqState').textContent = SET.mc.groqKeySet ? T('set.keySet') + ' ' + SET.mc.groqKeyHint : T('set.keyNone');
+  $('orState').textContent   = SET.mc.orKeySet   ? T('set.keySet') + ' ' + SET.mc.orKeyHint   : T('set.keyNone');
+  $('inGroqModel').value = SET.mc.groqModel || '';
+  $('inORModel').value   = SET.mc.orModel || '';
+  $('inMinGap').value    = SET.mc.minGapMs || 7000;
+  $('inIdle').value      = SET.mc.idleMs || 12000;
+  $('storageNote').textContent = SET.storage === 'supabase' ? T('set.storageDb') : T('set.storageMem');
+  $('typeList').textContent = SET.audioTypes
+    .map(t => `${t.label} (.${t.ext})${t.ios ? '' : ' ✗iOS'}`).join(' · ');
+  renderSlots();
+}
+
+function renderSlots(){
+  const byKind = { bgm: [], sfx: [], cut: [] };
+  for (const s of SET.slots) byKind[s.kind].push(s);
+  const assets = Object.fromEntries(SET.audio.assets.map(a => [a.id, a]));
+  const accept = SET.audioTypes.map(t => '.' + t.ext).join(',') + ',audio/*';
+
+  const group = (title, list) => `
+    <div style="margin-bottom:16px">
+      <div class="hint" style="margin-bottom:8px"><b>${title}</b></div>
+      ${list.map(s => {
+        const a = assets[s.id] || {};
+        return `<div class="row" style="margin-bottom:8px;flex-wrap:wrap;gap:8px">
+          <div style="min-width:170px">
+            <div style="font-size:.9rem">${T(s.i18n)}</div>
+            <div class="hint">${a.url ? (a.name || '') + ' · ' + (a.ext || '').toUpperCase()
+                                       + ' · ' + Math.round((a.size || 0) / 1024) + ' KB'
+                                     : T('set.none')} · ${T('set.maxSize', { n: s.maxMB })}</div>
+          </div>
+          <label class="tag" style="cursor:pointer;border:1px solid var(--line);
+                 border-radius:9px;padding:8px 12px">
+            <span data-lbl>${T('set.upload')}</span>
+            <input type="file" accept="${accept}" data-slot="${s.id}" style="display:none">
+          </label>
+          ${a.url ? `<button data-play="${a.url}" style="padding:8px 12px;font-size:.8rem">${T('set.preview')}</button>
+                     <button data-del="${s.id}" style="padding:8px 12px;font-size:.8rem">${T('set.remove')}</button>` : ''}
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  $('slotList').innerHTML =
+      group(T('set.groupBgm'), byKind.bgm)
+    + group(T('set.groupSfx'), byKind.sfx)
+    + group(T('set.groupCut'), byKind.cut);
+
+  $('slotList').querySelectorAll('input[type=file]').forEach(inp => {
+    inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      const lbl = inp.parentElement.querySelector('[data-lbl]');
+      lbl.textContent = T('set.uploading');
+      try {
+        const r = await fetch('/api/audio/' + inp.dataset.slot, {
+          method: 'PUT',
+          headers: { ...setHeaders(), 'Content-Type': f.type || 'application/octet-stream',
+                     'x-file-name': encodeURIComponent(f.name) },
+          body: f,
+        }).then(r => r.json());
+        if (r.error) throw new Error(r.error);
+      } catch (e) { alert(T('set.err', { m: e.message })); }
+      await loadSettings();
+    };
+  });
+  $('slotList').querySelectorAll('[data-play]').forEach(b => {
+    b.onclick = () => { const a = new Audio(b.dataset.play); a.volume = .6; a.play().catch(() => {}); };
+  });
+  $('slotList').querySelectorAll('[data-del]').forEach(b => {
+    b.onclick = async () => {
+      await fetch('/api/audio/' + b.dataset.del, { method:'DELETE', headers: setHeaders() });
+      await loadSettings();
+    };
+  });
+}
+
+$('btnSaveAI').onclick = async () => {
+  const body = {
+    groqKey: $('inGroq').value.trim(),
+    orKey: $('inOR').value.trim(),
+    groqModel: $('inGroqModel').value.trim(),
+    orModel: $('inORModel').value.trim(),
+    minGapMs: +$('inMinGap').value || undefined,
+    idleMs: +$('inIdle').value || undefined,
+    lang: LANG,
+  };
+  try {
+    const r = await fetch('/api/settings', {
+      method:'POST', headers: { ...setHeaders(), 'Content-Type':'application/json' },
+      body: JSON.stringify(body),
+    }).then(r => r.json());
+    if (r.error) throw new Error(r.error);
+    $('inGroq').value = ''; $('inOR').value = '';
+    $('saveState').textContent = T('set.saved');
+    setTimeout(() => $('saveState').textContent = '', 2500);
+    await loadSettings();
+  } catch (e) { alert(T('set.err', { m: e.message })); }
 };
 
 $('btnMC').onclick = () => {
@@ -205,7 +402,10 @@ $('btnMC').onclick = () => {
 $('mcText').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnMC').click(); });
 
 $('btnCut').onclick = () => {
-  const [nameTh, nameJa, tier] = $('selPattern').value.split('|');
+  const p = $('selPattern').value;
+  const nameTh = I ? I.T('pat.'+p, null, 'th') : p;
+  const nameJa = I ? I.T('pat.'+p, null, 'ja') : '';
+  const tier = TIERS[p] || 'SR';
   // เน้นตาล่าสุดของห้องที่กำลังออกอากาศ
   const st = program && states.get(program);
   const lm = st && st.game.lastMove;
@@ -225,7 +425,7 @@ function render(){
         <span>${r.size}×${r.size}</span>
       </div>
       <div class="meta">
-        <span>${r.black || '—'} vs ${r.white || '—'}</span><span>ตาที่ ${r.moves}</span>
+        <span>${r.black || '—'} vs ${r.white || '—'}</span><span>${T('dir.moves', { n:r.moves })}</span>
       </div>
       <div class="heat"><i style="width:${Math.max(3, r.heat)}%"></i></div>`;
     el.onclick = () => {
@@ -244,9 +444,10 @@ function render(){
 function paintDeck(canvasId, prefix, code){
   const st = code && states.get(code);
   drawMini($(canvasId), st, st ? st.game.size : 9);
-  $(prefix + 'Title').textContent = code ? 'ห้อง ' + code : (prefix === 'pg' ? '— ไม่มีห้อง —' : '— ยังไม่ได้เลือก —');
+  $(prefix + 'Title').textContent = code ? T('live.room', { code })
+    : (prefix === 'pg' ? T('dir.noRoom') : T('dir.notPicked'));
   $(prefix + 'Info').textContent = st
-    ? `${st.players.black ? st.players.black.name : '—'} vs ${st.players.white ? st.players.white.name : '—'} · ตาที่ ${st.game.moveCount}`
+    ? `${st.players.black ? st.players.black.name : '—'} vs ${st.players.white ? st.players.white.name : '—'} · ${T('dir.moves', { n:st.game.moveCount })}`
     : '';
 }
 

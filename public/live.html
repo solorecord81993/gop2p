@@ -11,6 +11,7 @@
 <title>ภาพออกอากาศ — Go Battle Live</title>
 <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Noto+Sans+JP:wght@700&display=swap" rel="stylesheet">
 <script src="/go-engine.js"></script>
+<script src="/i18n.js"></script>
 <style>
 /* ═══════════════════════════════════════════════════════════════
  *  ภาพออกอากาศ 1080 × 1920 แนวตั้งสำหรับ TikTok
@@ -130,12 +131,9 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden}
 
 <div id="boot">
   <div>
-    <div class="b1">พร้อมถ่ายทอดสด</div>
-    <div class="b2">
-      แตะปุ่มด้านล่างก่อนเริ่มแชร์หน้าจอ<br>
-      เพื่อเปิดเสียงและกันหน้าจอดับระหว่างถ่ายทอด
-    </div>
-    <button id="btnBoot">แตะเพื่อเริ่ม</button>
+    <div class="b1" id="bootTitle"></div>
+    <div class="b2" id="bootBody"></div>
+    <button id="btnBoot"></button>
   </div>
 </div>
 
@@ -144,8 +142,8 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden}
   <div class="head">
     <div class="seal">碁</div>
     <div>
-      <div class="title">Go Battle Live</div>
-      <div class="sub">หมากล้อมออนไลน์ · กติกาสมาคมฯ</div>
+      <div class="title" id="tTitle">Go Battle Live</div>
+      <div class="sub" id="tTagline"></div>
     </div>
     <div class="roomtag" id="roomTag">——</div>
   </div>
@@ -153,17 +151,17 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden}
   <div class="pcard" id="cardTop">
     <span class="stone w" id="topStone"></span>
     <div>
-      <div class="pname" id="topName">รอผู้เล่น</div>
+      <div class="pname" id="topName"></div>
       <div class="prank" id="topRank">—</div>
     </div>
     <div class="pright">
       <div class="clock" id="topClock">—</div>
-      <div class="cap" id="topCap">เชลย 0</div>
+      <div class="cap" id="topCap"></div>
     </div>
   </div>
 
   <div class="bar"><i class="b" id="barB" style="width:50%"></i><i class="w" id="barW" style="width:50%"></i></div>
-  <div class="barlabel"><span id="barBTxt">ดำ —</span><span id="barWTxt">— ขาว</span></div>
+  <div class="barlabel"><span id="barBTxt"></span><span id="barWTxt"></span></div>
 
   <div class="boardbox">
     <canvas id="board" width="960" height="960"></canvas>
@@ -172,24 +170,24 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden}
   <div class="pcard" id="cardBot">
     <span class="stone b" id="botStone"></span>
     <div>
-      <div class="pname" id="botName">รอผู้เล่น</div>
+      <div class="pname" id="botName"></div>
       <div class="prank" id="botRank">—</div>
     </div>
     <div class="pright">
       <div class="clock" id="botClock">—</div>
-      <div class="cap" id="botCap">เชลย 0</div>
+      <div class="cap" id="botCap"></div>
     </div>
   </div>
 
   <div style="height:18px"></div>
-  <div class="mc" id="mcBox"><span class="who">MC</span><span id="mcText">รอเริ่มการถ่ายทอดสด…</span></div>
+  <div class="mc" id="mcBox"><span class="who" id="mcWho">MC</span><span id="mcText"></span></div>
 
   <!-- คัตซีนค่ายกล 3 วินาที -->
   <div id="cut">
     <div class="veil"></div><div class="rays"></div>
     <div class="plate">
       <div class="kanji" id="cutKanji">ウッテガエシ</div>
-      <div class="name"  id="cutName">ค่ายกลย้อนศร</div>
+      <div class="name"  id="cutName"></div>
       <div><span class="tier" id="cutTier">SSR</span></div>
     </div>
     <div class="brush"></div>
@@ -198,8 +196,8 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden}
   <!-- จอว่างตอนยังไม่มีห้องออกอากาศ -->
   <div class="idle" id="idle">
     <div class="in">
-      <div class="big" id="idleBig">รอเลือกห้องจากห้องคอนโทรล</div>
-      <div class="small" id="idleSmall">เปิด /director แล้วกด TAKE เพื่อส่งห้องขึ้นภาพนี้</div>
+      <div class="big" id="idleBig"></div>
+      <div class="small" id="idleSmall"></div>
     </div>
   </div>
 
@@ -214,10 +212,60 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden}
  * ═══════════════════════════════════════════════════════════════ */
 const $ = id => document.getElementById(id);
 const P = new URLSearchParams(location.search);
+
+// ถ้ามีอะไรพัง ให้ขึ้นข้อความบนจอ ดีกว่าปล่อยให้ภาพค้างเฉย ๆ กลางไลฟ์
+addEventListener('error', e => {
+  const el = document.getElementById('idleSmall');
+  if (el) el.textContent = 'Error: ' + (e.message || '?');
+});
 const TRANSITION = P.get('t') || 'ink';       // ink | fade | cut
-const { GoGame } = window.GoEngine;
+const GoGame = (window.GoEngine && window.GoEngine.GoGame) || null;   // ถ้าโหลดไม่ได้ ยังแสดงภาพได้ปกติ
 
 const AUTO = P.get('auto') === '1' || P.get('auto') === 'true';
+const I = window.I18N || { T:(k)=>k, SPEECH_LANG:{th:'th-TH',en:'en-US',ja:'ja-JP'}, rankLabel:()=> '—' };
+let LANG = ['th','en','ja'].includes(P.get('lang')) ? P.get('lang') : 'th';
+const T = (k, v) => I.T(k, v, LANG);
+
+/* ── เสียงพากย์ MC ──
+ * ใช้ speechSynthesis ของเบราว์เซอร์ ไม่ต้องพึ่งบริการภายนอก
+ * iPhone ต้องมีการแตะก่อนหนึ่งครั้งถึงจะพูดได้ — ปุ่ม "แตะเพื่อเริ่ม" ทำหน้าที่นั้น
+ */
+const Speech = (() => {
+  let enabled = false, voices = [];
+  const supported = typeof speechSynthesis !== 'undefined';
+  function loadVoices(){ if (supported) voices = speechSynthesis.getVoices() || []; }
+  if (supported && typeof speechSynthesis.addEventListener === 'function') {
+    speechSynthesis.addEventListener('voiceschanged', loadVoices);
+  }
+  function pick(lang){
+    const code = I.SPEECH_LANG[lang] || 'th-TH';
+    return voices.find(v => v.lang === code)
+        || voices.find(v => (v.lang || '').toLowerCase().startsWith(lang))
+        || null;
+  }
+  return {
+    unlock(){
+      if (!supported) return;
+      enabled = true; loadVoices();
+      try {
+        const u = new SpeechSynthesisUtterance(' ');
+        u.volume = 0; speechSynthesis.speak(u);
+      } catch {}
+    },
+    say(text, lang){
+      if (!enabled || !supported || !text) return;
+      try {
+        if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = I.SPEECH_LANG[lang] || 'th-TH';
+        const v = pick(lang); if (v) u.voice = v;
+        u.rate = 1.05;
+        speechSynthesis.speak(u);
+      } catch (e) { console.warn('พูดไม่ได้', e); }
+    },
+    get supported(){ return supported; },
+  };
+})();
 
 /* ── ปรับขนาดให้พอดีจอ ──
  * คอมพิวเตอร์/OBS : รักษาสัดส่วน 1080×1920 พอดีกรอบ
@@ -240,10 +288,19 @@ function fit(){
   st.style.setProperty('--safe-bot', bot + 'px');
   document.documentElement.style.setProperty('--board-max', Math.min(960, W - 96) + 'px');
 }
-if (AUTO){
-  $('idleBig').textContent = 'รอให้มีคนเริ่มเล่น';
-  $('idleSmall').textContent = 'โหมดอัตโนมัติ — ระบบจะยกห้องที่กำลังเล่นขึ้นภาพให้เอง';
+function applyLang(){
+  $('tTagline').textContent  = T('app.tagline');
+  $('mcWho').textContent     = T('mc.label');
+  $('bootTitle').textContent = T('live.bootTitle');
+  $('bootBody').textContent  = T('live.bootBody');
+  $('btnBoot').textContent   = T('live.bootBtn');
+  $('idleBig').textContent   = AUTO ? T('live.waitTitleAuto') : T('live.waitTitle');
+  $('idleSmall').textContent = AUTO ? T('live.waitBodyAuto')  : T('live.waitBody');
+  if (!$('mcText').textContent) $('mcText').textContent = T('mc.waiting');
+  document.documentElement.lang = LANG;
+  if (view) applyState(view);
 }
+applyLang();
 addEventListener('resize', fit);
 addEventListener('orientationchange', () => setTimeout(fit, 300));
 fit();
@@ -273,7 +330,45 @@ const Snd = (() => {
     player_join:() => { blip(520,.1); setTimeout(()=>blip(720,.13),95); },
     cut:        () => { blip(880,.09,'square',.5); setTimeout(()=>blip(1320,.28,'square',.42),90); },
   };
-  return { unlock, play: id => map[id] && map[id]() };
+  // ไฟล์เสียงที่ผู้กำกับอัปโหลด
+  const buffers = new Map();
+  const SLOT = { stone:'sfx_stone', capture:'sfx_capture', pass:'sfx_pass',
+                 game_start:'sfx_start', game_end:'sfx_end', cut:'sfx_cut' };
+  let bgmSrc = null, bgmGain = null;
+  function stopBGM(){ if (bgmSrc){ try{ bgmSrc.stop(); }catch{} bgmSrc = null; } }
+
+  return {
+    unlock, buffers,
+    play(id){
+      const slot = SLOT[id] || id;
+      if (ctx && buffers.has(slot)){
+        const s = ctx.createBufferSource(); s.buffer = buffers.get(slot);
+        const g = ctx.createGain(); g.gain.value = .8;
+        s.connect(g); g.connect(ctx.destination); s.start();
+        return;
+      }
+      map[id] && map[id]();
+    },
+    async preload(list){
+      if (!ctx) return;
+      for (const { id, url } of list){
+        try {
+          const buf = await fetch(url).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b));
+          buffers.set(id, buf);
+        } catch (e) { console.warn('โหลดเสียงไม่สำเร็จ', id, e); }
+      }
+    },
+    // เพลงประกอบต้องวนเสมอ ไม่มีทางเงียบเองตอนจบแทร็ก
+    playBGM(slot){
+      if (!ctx || !buffers.has(slot)) return;
+      stopBGM();
+      bgmSrc = ctx.createBufferSource(); bgmSrc.buffer = buffers.get(slot); bgmSrc.loop = true;
+      bgmGain = ctx.createGain(); bgmGain.gain.value = .28;
+      bgmSrc.connect(bgmGain); bgmGain.connect(ctx.destination); bgmSrc.start();
+    },
+    stopBGM,
+    duck(on){ if (bgmGain) bgmGain.gain.value = on ? .08 : .28; },   // หรี่เพลงตอน MC พูด
+  };
 })();
 
 /* ── กันหน้าจอดับระหว่างถ่ายทอด ── */
@@ -292,9 +387,10 @@ async function keepAwake(){
 }
 
 $('btnBoot').onclick = () => {
-  Snd.unlock(); keepAwake();
+  Snd.unlock(); Speech.unlock(); keepAwake();
   $('boot').style.display = 'none';
   fit();
+  fetch('/api/manifest').then(r => r.json()).then(applyManifest).catch(() => {});
 };
 
 let view = null, program = null, clockBase = null, localGame = null;
@@ -305,8 +401,8 @@ function connect(){
   const ws = new WebSocket(location.origin.replace(/^http/, 'ws'));
   ws.onopen = () => {
     retry = 0;
-    ws.send(JSON.stringify({ t:'auth', name:'ภาพออกอากาศ' }));
-    setTimeout(() => ws.send(JSON.stringify({ t:'live', auto: AUTO })), 120);
+    ws.send(JSON.stringify({ t:'auth', name:'live-view' }));
+    setTimeout(() => ws.send(JSON.stringify({ t:'live', auto: AUTO, lang: LANG })), 120);
   };
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
@@ -318,12 +414,40 @@ function connect(){
     }
     if (m.t === 'state' || m.t === 'end') applyState(m);
     if (m.t === 'highlight') playCutscene(m);      // ค่ายกล — เห็นเฉพาะบนไลฟ์
-    if (m.t === 'mc') setMC(m.text);
+    if (m.t === 'mc'){
+      setMC(m.text);
+      Snd.duck(true); Speech.say(m.text, m.lang || LANG);
+      clearTimeout(window.__duck);
+      window.__duck = setTimeout(() => Snd.duck(false), Math.min(9000, 1200 + m.text.length * 90));
+    }
+    if (m.t === 'manifest') applyManifest(m);
+    if (m.t === 'mc_info' && m.lang) LANG = m.lang;
     if (m.t === 'sfx') Snd.play(m.id);
   };
   ws.onclose = () => setTimeout(connect, Math.min(6000, 700 * ++retry));
 }
 connect();
+
+let bgmNow = null;
+async function applyManifest(mf){
+  const list = (mf.assets || []).filter(a => a.url).map(a => ({ id:a.id, url:a.url }));
+  if (!list.length) return;
+  await Snd.preload(list);
+  updateBGM(true);
+}
+function updateBGM(force){
+  const st = view && view.state;
+  let want = 'bgm_lobby';
+  if (st === 'playing') want = 'bgm_play';
+  else if (st === 'finished') want = 'bgm_result';
+  if (st === 'playing' && clockBase){
+    const c = clockBase.clocks[clockBase.turn === 1 ? 'black' : 'white'];
+    if (c && c.main === 0) want = 'bgm_tense';
+  }
+  if (!Snd.buffers.has(want)) want = Snd.buffers.has('bgm_lobby') ? 'bgm_lobby' : null;
+  if (!want) return Snd.stopBGM();
+  if (want !== bgmNow || force){ bgmNow = want; Snd.playBGM(want); }
+}
 
 function playTransition(kind){
   const c = $('board');
@@ -333,7 +457,13 @@ function playTransition(kind){
   if (kind === 'fade') c.classList.add('fadein');
 }
 
-function setMC(text){ $('mcText').textContent = text; }
+let mcSpokenAt = 0;
+function setMC(text, soft){
+  // soft = ข้อความสถานะ จะไม่ทับประโยคที่ MC เพิ่งพูดภายใน 6 วินาที
+  if (soft && Date.now() - mcSpokenAt < 6000) return;
+  if (!soft) mcSpokenAt = Date.now();
+  $('mcText').textContent = text;
+}
 
 /* ── รับสถานะห้อง ── */
 function applyState(m){
@@ -341,11 +471,13 @@ function applyState(m){
   view = m;
   clockBase = { at: Date.now(), clocks: m.clocks, turn: m.game.turn };
 
-  localGame = new GoGame({ size:m.game.size, komi:m.game.komi });
-  localGame.board.set(m.game.board);
-  localGame.turn = m.game.turn;
+  if (GoGame){
+    localGame = new GoGame({ size:m.game.size, komi:m.game.komi });
+    localGame.board.set(m.game.board);
+    localGame.turn = m.game.turn;
+  }
 
-  $('roomTag').textContent = 'ห้อง ' + m.code;
+  $('roomTag').textContent = T('live.room', { code:m.code });
 
   // ขาวอยู่บน ดำอยู่ล่าง (ตามธรรมเนียมการถ่ายทอดโกะ)
   paint('top', m.players.white, 2, m);
@@ -355,29 +487,38 @@ function applyState(m){
 
   updateBar();
   draw();
+  updateBGM();
 
-  if (m.state === 'waiting')      setMC('ห้อง ' + m.code + ' กำลังรอคู่แข่ง');
-  else if (m.state === 'ready')   setMC('ผู้เล่นครบแล้ว กำลังจะเริ่ม');
-  else if (m.state === 'playing') setMC(`ตาที่ ${m.game.moveCount} · ${m.game.turn === 1 ? 'ตาดำ' : 'ตาขาว'}`);
-  else if (m.state === 'marking') setMC('จบเกมแล้ว กำลังตกลงหมากตายก่อนนับแต้ม');
+  // ข้อความสถานะใช้เฉพาะตอนที่ MC ยังไม่พูดอะไร เพื่อไม่ให้ทับเสียงพากย์
+  if (m.state === 'waiting')      setMC(T('mc.roomWaiting', { code:m.code }), true);
+  else if (m.state === 'ready')   setMC(T('mc.ready'), true);
+  else if (m.state === 'marking') setMC(T('mc.marking'), true);
   else if (m.state === 'finished' && m.result){
-    const who = m.result.type === 'black_win' ? 'ดำชนะ'
-              : m.result.type === 'white_win' ? 'ขาวชนะ'
-              : m.result.type === 'draw' ? 'เสมอ' : 'ไม่มีผลแพ้ชนะ';
-    setMC(`${who} · ${m.result.text}${m.result.reason ? ' (' + m.result.reason + ')' : ''}`);
+    const who = m.result.type === 'black_win' ? T('end.blackWin')
+              : m.result.type === 'white_win' ? T('end.whiteWin')
+              : m.result.type === 'draw' ? T('end.draw') : T('end.noResult');
+    setMC(`${who} · ${m.result.text}`, true);
   }
 }
 
 function paint(pos, p, colorNum, m){
   $(pos+'Stone').className = 'stone ' + (colorNum === 1 ? 'b' : 'w');
-  $(pos+'Name').textContent = p ? p.name + (p.ai ? ' 🤖' : '') : 'รอผู้เล่น';
-  $(pos+'Rank').textContent = p ? p.rank + ' (ในระบบ)' : '—';
-  $(pos+'Cap').textContent  = 'เชลย ' + (colorNum === 1 ? m.game.prisoners.black : m.game.prisoners.white);
+  $(pos+'Name').textContent = p ? p.name + (p.ai ? ' 🤖' : '') : T('game.waitingPlayer');
+  $(pos+'Rank').textContent = p ? T('live.rankSys', { rank:p.rank }) : '—';
+  $(pos+'Cap').textContent  = T('game.prisoners', { n: colorNum === 1 ? m.game.prisoners.black : m.game.prisoners.white });
 }
 
 /* ── แถบประเมินคะแนน: อิทธิพลอย่างง่าย + เชลย + โคมิ ── */
 function estimate(){
-  if (!view || !localGame) return { b:0.5, black:0, white:0 };
+  if (!view) return { b:0.5, black:0, white:0 };
+  if (!localGame) {   // ไม่มีเอนจิน ใช้จำนวนเม็ดหมากบนกระดานประมาณคร่าว ๆ แทน
+    const bd = view.game.board;
+    let nb = 0, nw = 0;
+    for (const v of bd){ if (v === 1) nb++; else if (v === 2) nw++; }
+    const black = nb + view.game.prisoners.black;
+    const white = nw + view.game.prisoners.white + view.game.komi;
+    return { b: black / (black + white || 1), black:Math.round(black), white:Math.round(white*10)/10 };
+  }
   const N = view.game.size, b = view.game.board;
   // แผนที่อิทธิพล: แผ่จากเม็ดหมากออกไป 4 รอบ (Bouzy อย่างย่อ)
   let inf = new Float32Array(N*N);
@@ -404,8 +545,8 @@ function updateBar(){
   const pct = Math.max(6, Math.min(94, e.b * 100));
   $('barB').style.width = pct + '%';
   $('barW').style.width = (100 - pct) + '%';
-  $('barBTxt').textContent = 'ดำ ~' + e.black;
-  $('barWTxt').textContent = '~' + e.white + ' ขาว';
+  $('barBTxt').textContent = T('live.barBlack', { n:e.black });
+  $('barWTxt').textContent = T('live.barWhite', { n:e.white });
 }
 
 /* ── วาดกระดาน ── */
@@ -489,7 +630,7 @@ function playCutscene(m){
   if (cutBusy) return;                     // ไม่ซ้อนกัน คิวถัดไปทิ้ง
   cutBusy = true;
   cutCoords = m.coords || null;
-  $('cutName').textContent  = m.nameTh || 'ค่ายกล';
+  $('cutName').textContent  = (LANG === 'ja' && m.nameJa) ? m.nameJa : (m.nameTh || T('pat.snapback'));
   $('cutKanji').textContent = m.nameJa || '';
   $('cutTier').textContent  = m.tier || 'SR';
   Snd.play('cut');
@@ -517,7 +658,7 @@ setInterval(() => {
       node.classList.remove('pulse');
     } else {
       const left = Math.max(0, (c.byoyomi || 0) - live);
-      node.textContent = `${Math.ceil(left/1000)} วิ · ${c.periods}`;
+      node.textContent = T('game.byoyomi', { s: Math.ceil(left/1000), p: c.periods });
       node.classList.add('warn');
       node.classList.toggle('pulse', running && clockBase.turn === num);
     }
@@ -527,7 +668,7 @@ setInterval(() => {
 /* ── ทดสอบคัตซีนจากแถบที่อยู่: /live.html?demo=1 ── */
 if (P.get('demo')){
   setTimeout(() => playCutscene({
-    nameTh:'ค่ายกลย้อนศร', nameJa:'ウッテガエシ', tier:'SSR',
+    nameTh:T('pat.snapback'), nameJa:'ウッテガエシ', tier:'SSR',
     coords:[[3,3],[4,3],[3,4]],
   }), 1200);
 }

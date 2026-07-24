@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/go-engine.js"></script>
+<script src="/i18n.js"></script>
 <style>
 :root{
   --sumi:#161311; --sumi-2:#211C18; --sumi-3:#2C2621; --line:#3A322B;
@@ -104,54 +105,57 @@ canvas{width:100%; height:auto; display:block; border-radius:12px; touch-action:
     <span class="seal">碁</span>
     <div>
       <h1 style="font-size:1.25rem;line-height:1.2">Go Battle Live</h1>
-      <div class="hint">หมากล้อมออนไลน์ · กติกาสมาคมกีฬาหมากล้อมแห่งประเทศไทย</div>
+      <div class="hint" data-i18n="app.tagline"></div>
     </div>
   </div>
 
   <div class="card">
     <div class="chips" style="margin-bottom:15px">
-      <div class="chip on" data-tab="login">เข้าสู่ระบบ</div>
-      <div class="chip" data-tab="signup">สมัครสมาชิก</div>
+      <div class="chip on" data-tab="login" data-i18n="auth.login"></div>
+      <div class="chip" data-tab="signup" data-i18n="auth.signup"></div>
     </div>
 
     <div id="tabLogin">
-      <label>อีเมล</label><input id="liEmail" type="email" autocomplete="email" inputmode="email">
+      <label data-i18n="auth.username"></label>
+      <input id="liUser" autocomplete="username" autocapitalize="none" spellcheck="false"
+             maxlength="20" data-i18n-ph="auth.usernamePh">
       <div style="height:11px"></div>
-      <label>รหัสผ่าน</label><input id="liPass" type="password" autocomplete="current-password">
+      <label data-i18n="auth.password"></label>
+      <input id="liPass" type="password" autocomplete="current-password">
       <div style="height:15px"></div>
-      <button class="btn-main btn-wide" id="btnLogin">เข้าสู่ระบบ</button>
+      <button class="btn-main btn-wide" id="btnLogin" data-i18n="auth.login"></button>
     </div>
 
     <div id="tabSignup" class="hidden">
-      <label>ชื่อที่ใช้แสดง</label><input id="suName" maxlength="24" placeholder="เช่น น้องโกะ">
+      <label data-i18n="auth.usernameRule"></label>
+      <input id="suUser" autocomplete="username" autocapitalize="none" spellcheck="false"
+             maxlength="20" data-i18n-ph="auth.usernamePh">
       <div style="height:11px"></div>
-      <label>อีเมล</label><input id="suEmail" type="email" autocomplete="email" inputmode="email">
+      <label data-i18n="auth.displayName"></label>
+      <input id="suName" maxlength="24" data-i18n-ph="auth.displayNamePh">
       <div style="height:11px"></div>
-      <label>รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label><input id="suPass" type="password" autocomplete="new-password">
+      <label data-i18n="auth.passwordRule"></label>
+      <input id="suPass" type="password" autocomplete="new-password">
       <div style="height:11px"></div>
-      <label>ปีเกิด พ.ศ.</label><input id="suYear" type="number" inputmode="numeric" placeholder="2555">
-      <div id="guardianWrap" class="hidden" style="margin-top:11px">
-        <label>อีเมลผู้ปกครอง — จำเป็นสำหรับผู้ที่อายุต่ำกว่า 13 ปี</label>
-        <input id="suGuardian" type="email" inputmode="email">
-      </div>
-      <div style="height:11px"></div>
-      <label>ประเมินฝีมือตัวเอง (ปรับได้ภายหลัง)</label>
+      <label data-i18n="auth.rankEstimate"></label>
       <select id="suRank">
-        <option value="100">เพิ่งเริ่มหัด — 20 คิว</option>
-        <option value="600">พอเล่นเป็น — 15 คิว</option>
-        <option value="1100">เล่นมาสักพัก — 10 คิว</option>
-        <option value="1600">แข่งมาบ้าง — 5 คิว</option>
-        <option value="2000">ใกล้ระดับดั้ง — 1 คิว</option>
-        <option value="2100">ระดับดั้ง — 1 ดั้ง</option>
+        <option value="100" data-i18n="rank.20k"></option>
+        <option value="600" data-i18n="rank.15k"></option>
+        <option value="1100" data-i18n="rank.10k"></option>
+        <option value="1600" data-i18n="rank.5k"></option>
+        <option value="2000" data-i18n="rank.1k"></option>
+        <option value="2100" data-i18n="rank.1d"></option>
       </select>
       <div style="height:15px"></div>
-      <button class="btn-main btn-wide" id="btnSignup">สมัครสมาชิก</button>
+      <button class="btn-main btn-wide" id="btnSignup" data-i18n="auth.signup"></button>
+      <div class="hint" style="margin-top:9px" data-i18n="auth.noEmailNote"></div>
     </div>
 
     <div class="err" id="authErr" style="margin-top:11px"></div>
     <div style="border-top:1px solid var(--line); margin:14px 0"></div>
-    <button class="btn-ghost btn-wide" id="btnGuest">เล่นเลยแบบผู้มาเยือน</button>
-    <div class="hint" style="margin-top:9px">ผู้มาเยือนเล่นได้ครบทุกอย่าง แต่จะไม่มีดั้งและไม่ขึ้นตารางอันดับ</div>
+    <button class="btn-ghost btn-wide" id="btnGuest" data-i18n="auth.guest"></button>
+    <div class="hint" style="margin-top:9px" data-i18n="auth.guestNote"></div>
+    <div class="hint" id="netStatus" style="margin-top:12px"></div>
   </div>
 </section>
 
@@ -164,59 +168,59 @@ canvas{width:100%; height:auto; display:block; border-radius:12px; touch-action:
       <div class="psub" id="meRank">—</div>
     </div>
     <button class="btn-ghost btn-sm" id="btnSound">🔊</button>
-    <button class="btn-ghost btn-sm" id="btnLogout">ออก</button>
+    <button class="btn-ghost btn-sm" id="btnLang">TH</button>
+    <button class="btn-ghost btn-sm" id="btnLogout" data-i18n="home.logout"></button>
   </div>
 
   <div class="card" id="firstTime">
     <div class="row" style="align-items:flex-start">
       <div class="grow hint" style="color:var(--shell)">
-        <b>เล่นยังไง</b><br>
-        ผลัดกันวางหมากเพื่อล้อมพื้นที่ให้ได้มากกว่าอีกฝ่าย ล้อมหมากคู่แข่งจนหมดลมหายใจจะจับกินได้
-        เมื่อไม่มีที่จะเล่นแล้วให้กด “ผ่าน” ทั้งสองฝ่าย แล้วนับแต้มกัน
+        <b data-i18n="home.helpTitle"></b><br>
+        <span data-i18n="home.helpBody"></span>
       </div>
-      <button class="btn-ghost btn-sm" id="btnDismissHelp">เข้าใจแล้ว</button>
+      <button class="btn-ghost btn-sm" id="btnDismissHelp" data-i18n="home.helpOk"></button>
     </div>
   </div>
 
   <div class="card">
-    <h3 style="font-size:1rem;margin-bottom:12px">เริ่มเกมใหม่</h3>
-    <label>ขนาดกระดาน</label>
+    <h3 style="font-size:1rem;margin-bottom:12px" data-i18n="home.newGame"></h3>
+    <label data-i18n="home.boardSize"></label>
     <div class="chips" id="sizeChips">
-      <div class="chip on" data-size="9">9×9<span class="psub" style="margin-left:6px">โคมิ 1.5</span></div>
-      <div class="chip" data-size="13">13×13<span class="psub" style="margin-left:6px">โคมิ 3.5</span></div>
-      <div class="chip" data-size="19">19×19<span class="psub" style="margin-left:6px">โคมิ 6.5</span></div>
+      <div class="chip on" data-size="9">9×9<span class="psub komi" style="margin-left:6px" data-komi="1.5"></span></div>
+      <div class="chip" data-size="13">13×13<span class="psub komi" style="margin-left:6px" data-komi="3.5"></span></div>
+      <div class="chip" data-size="19">19×19<span class="psub komi" style="margin-left:6px" data-komi="6.5"></span></div>
     </div>
-    <div class="hint" style="margin-top:7px" id="sizeHint">9×9 จบเร็วราว 10 นาที เหมาะกับผู้เริ่มต้นและการถ่ายทอดสด</div>
+    <div class="hint" style="margin-top:7px" id="sizeHint"></div>
 
     <div style="height:14px"></div>
-    <label>เวลาแข่ง</label>
+    <label data-i18n="home.time"></label>
     <select id="selTime">
-      <option value="300,30,3">โหมดไลฟ์ · 5 นาที + เบียวโยมิ 30 วิ × 3</option>
-      <option value="1200,0,0">Friendship · 20 นาที</option>
-      <option value="2100,0,0">ระดับคิว · 35 นาที</option>
-      <option value="2700,0,0">ระดับดั้ง · 45 นาที</option>
-      <option value="3600,10,3">คัดตัวทีมชาติ · 60 นาที + เบียวโยมิ 10 วิ × 3</option>
+      <option value="300,30,3" data-i18n="time.live"></option>
+      <option value="1200,0,0" data-i18n="time.friendship"></option>
+      <option value="2100,0,0" data-i18n="time.kyu"></option>
+      <option value="2700,0,0" data-i18n="time.dan"></option>
+      <option value="3600,10,3" data-i18n="time.national"></option>
     </select>
 
     <div style="height:15px"></div>
-    <button class="btn-main btn-wide" id="btnCreate">สร้างห้องรอคู่แข่ง</button>
+    <button class="btn-main btn-wide" id="btnCreate" data-i18n="home.create"></button>
     <div style="height:9px"></div>
     <div class="row">
       <select id="selAI" class="grow">
-        <option value="seed15k|น้องเมล็ด|0.10|600">น้องเมล็ด · 15 คิว</option>
-        <option value="bamboo10k|พี่ไผ่|0.32|1100">พี่ไผ่ · 10 คิว</option>
-        <option value="ping8k|พี่ครูปิง|0.60|1300">พี่ครูปิง · 8 คิว</option>
+        <option value="seed15k|0.10|600" data-i18n="ai.seed15k"></option>
+        <option value="bamboo10k|0.32|1100" data-i18n="ai.bamboo10k"></option>
+        <option value="ping8k|0.60|1300" data-i18n="ai.ping8k"></option>
       </select>
-      <button class="btn-ghost" id="btnAI" style="white-space:nowrap">ซ้อมกับ AI</button>
+      <button class="btn-ghost" id="btnAI" style="white-space:nowrap" data-i18n="home.aiBtn"></button>
     </div>
   </div>
 
   <div class="card">
-    <h3 style="font-size:1rem;margin-bottom:12px">เข้าห้องเพื่อน</h3>
+    <h3 style="font-size:1rem;margin-bottom:12px" data-i18n="home.joinTitle"></h3>
     <div class="row">
       <input id="inCode" class="grow" maxlength="6" placeholder="ABC123" autocapitalize="characters"
              style="text-transform:uppercase;letter-spacing:.2em;font-family:Mitr;text-align:center">
-      <button class="btn-main" id="btnJoin">เข้า</button>
+      <button class="btn-main" id="btnJoin" data-i18n="home.enter"></button>
     </div>
   </div>
 </section>
@@ -224,52 +228,49 @@ canvas{width:100%; height:auto; display:block; border-radius:12px; touch-action:
 <!-- ═══════════ 3. หน้าเกม ═══════════ -->
 <section id="scGame" class="hidden fade">
   <div class="row">
-    <button class="btn-ghost btn-sm" id="btnLeave">← ออก</button>
+    <button class="btn-ghost btn-sm" id="btnLeave" data-i18n="game.leave"></button>
     <div class="grow" style="text-align:center">
-      <span id="onAirBadge" class="onair hidden">● ออกอากาศ</span>
+      <span id="onAirBadge" class="onair hidden" data-i18n="game.onAir"></span>
     </div>
     <button class="btn-ghost btn-sm" id="btnSound2">🔊</button>
-    <button class="btn-ghost btn-sm" id="btnCopy">รหัส <span id="gCode" style="color:var(--kaya)">——</span></button>
+    <button class="btn-ghost btn-sm" id="btnCopy"><span id="copyLbl"></span> <span id="gCode" style="color:var(--kaya)">——</span></button>
   </div>
 
   <div id="pTop" class="pcard">
     <span class="dot" id="topDot"></span>
-    <div class="grow"><div class="pname" id="topName">รอผู้เล่น</div><div class="psub" id="topSub">—</div></div>
-    <div><div class="clock" id="topClock">—</div><div class="psub" id="topCap" style="text-align:right">เชลย 0</div></div>
+    <div class="grow"><div class="pname" id="topName"></div><div class="psub" id="topSub">—</div></div>
+    <div><div class="clock" id="topClock">—</div><div class="psub" id="topCap" style="text-align:right"></div></div>
   </div>
 
   <div class="boardwrap"><canvas id="board" width="900" height="900"></canvas></div>
 
   <div id="pBot" class="pcard me">
     <span class="dot" id="botDot"></span>
-    <div class="grow"><div class="pname" id="botName">รอผู้เล่น</div><div class="psub" id="botSub">—</div></div>
-    <div><div class="clock" id="botClock">—</div><div class="psub" id="botCap" style="text-align:right">เชลย 0</div></div>
+    <div class="grow"><div class="pname" id="botName"></div><div class="psub" id="botSub">—</div></div>
+    <div><div class="clock" id="botClock">—</div><div class="psub" id="botCap" style="text-align:right"></div></div>
   </div>
 
-  <div id="statusBar" class="status">กำลังเชื่อมต่อ…</div>
+  <div id="statusBar" class="status" data-i18n="game.connecting"></div>
 
   <div class="bar" id="barWait">
-    <button class="btn-main grow" id="btnReady">พร้อมแล้ว</button>
+    <button class="btn-main grow" id="btnReady" data-i18n="game.ready"></button>
   </div>
 
   <div class="bar hidden" id="barConfirm">
-    <button class="btn-ghost" id="btnCancelMove">ยกเลิก</button>
-    <button class="btn-main grow" id="btnPlaceHere">วางตรงนี้</button>
+    <button class="btn-ghost" id="btnCancelMove" data-i18n="game.cancel"></button>
+    <button class="btn-main grow" id="btnPlaceHere" data-i18n="game.placeHere"></button>
   </div>
 
   <div class="bar hidden" id="barPlay">
-    <button class="btn-ghost grow" id="btnPass">ผ่าน</button>
-    <button class="btn-ghost grow" id="btnResign">ยอมแพ้</button>
+    <button class="btn-ghost grow" id="btnPass" data-i18n="game.pass"></button>
+    <button class="btn-ghost grow" id="btnResign" data-i18n="game.resign"></button>
   </div>
 
   <div class="hidden" id="barMark">
-    <div class="status" style="margin-bottom:10px">
-      แตะหมู่หมากที่ <b>ตายแล้ว</b> เพื่อทำเครื่องหมายกากบาท พื้นที่จะคำนวณให้ดูทันที
-      เมื่อทั้งสองฝ่ายกดยืนยันตรงกัน ระบบจะนับแต้มให้
-    </div>
+    <div class="status" style="margin-bottom:10px" data-i18n="game.markHelp"></div>
     <div class="row">
-      <button class="btn-main grow" id="btnConfirm">ยืนยันนับแต้ม</button>
-      <button class="btn-ghost grow" id="btnResume">ยังไม่ตกลง</button>
+      <button class="btn-main grow" id="btnConfirm" data-i18n="game.confirmScore"></button>
+      <button class="btn-ghost grow" id="btnResume" data-i18n="game.resume"></button>
     </div>
   </div>
 
@@ -278,8 +279,8 @@ canvas{width:100%; height:auto; display:block; border-radius:12px; touch-action:
     <div class="hint" id="endDetail"></div>
     <div style="height:14px"></div>
     <div class="row">
-      <button class="btn-ghost grow" id="btnSGF">บันทึก SGF</button>
-      <button class="btn-main grow" id="btnHome">กลับหน้าแรก</button>
+      <button class="btn-ghost grow" id="btnSGF" data-i18n="game.saveSgf"></button>
+      <button class="btn-main grow" id="btnHome" data-i18n="game.backHome"></button>
     </div>
   </div>
 </section>
@@ -299,12 +300,50 @@ const CONFIG = {
   SERVER_URL: location.origin.replace(/^http/, 'ws'),
 };
 
-const hasSB = /^https:\/\/[a-z0-9]+\.supabase\.co$/.test(CONFIG.SUPABASE_URL)
-           && CONFIG.SUPABASE_ANON_KEY.split('.').length === 3;
-const sb = hasSB ? supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
-const { GoGame } = window.GoEngine;
-
 const $ = id => document.getElementById(id);
+
+/* ── ภาษา: ไทย / อังกฤษ / ญี่ปุ่น ── */
+const I = window.I18N;
+const LANG_ORDER = ['th', 'en', 'ja'];
+function guessLang(){
+  const saved = localStorage.getItem('gb_lang');
+  if (LANG_ORDER.includes(saved)) return saved;
+  const n = (navigator.language || 'th').toLowerCase();
+  if (n.startsWith('ja')) return 'ja';
+  if (n.startsWith('th')) return 'th';
+  return 'en';
+}
+let LANG = guessLang();
+const T = (k, v) => (I ? I.T(k, v, LANG) : k);
+const gorLabel = g => (I ? I.rankLabel(g, LANG) : '—');
+
+/* ── แถบแจ้งข้อผิดพลาดบนหน้าจอ ──
+ * เดิมถ้าสคริปต์ภายนอกโหลดไม่สำเร็จ ทั้งหน้าจะตายเงียบ ๆ กดปุ่มอะไรก็ไม่มีอะไรเกิดขึ้น
+ * ตอนนี้จะขึ้นข้อความบอกสาเหตุแทน */
+function fatal(msg){
+  let box = $('fatalBox');
+  if (!box){
+    box = document.createElement('div');
+    box.id = 'fatalBox';
+    box.style.cssText = 'position:fixed;left:10px;right:10px;top:10px;z-index:999;background:#5A1E19;'
+      + 'color:#FFE9E6;border:1px solid #C2372E;border-radius:12px;padding:12px 14px;'
+      + 'font-size:.85rem;line-height:1.6;white-space:pre-wrap';
+    document.body.appendChild(box);
+  }
+  box.textContent = (window.I18N ? window.I18N.T('err.fatal', null, LANG) : 'Error: ') + msg;
+}
+addEventListener('error', e => fatal((e.message || '?') + (e.filename ? '\n' + e.filename : '')));
+addEventListener('unhandledrejection', e => fatal(String(e.reason && e.reason.message || e.reason)));
+
+/* ── ตรวจว่าสคริปต์ภายนอกโหลดครบไหม แล้วค่อยเริ่ม ── */
+const hasSB = /^https:\/\/[a-z0-9]+\.supabase\.co$/.test(CONFIG.SUPABASE_URL)
+           && CONFIG.SUPABASE_ANON_KEY.split('.').length === 3
+           && typeof window.supabase !== 'undefined';
+const sb = hasSB ? window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY) : null;
+
+// เอนจินโกะใช้ตรวจกติกาและคำนวณพื้นที่ฝั่งเบราว์เซอร์
+// ถ้าโหลดไม่ได้ก็ยังเล่นได้ เพียงแต่ต้องรอเซิร์ฟเวอร์ตอบว่าตาไหนผิดกติกา
+const GoGame = (window.GoEngine && window.GoEngine.GoGame) || null;
 const show = id => ['scAuth','scHome','scGame'].forEach(s => $(s).classList.toggle('hidden', s !== id));
 function toast(msg){
   document.querySelectorAll('.toast').forEach(t => t.remove());
@@ -344,6 +383,7 @@ const Sound = (() => {
     tick:       () => blip(880, .04, 'sine', 'sfx', .25),
   };
   function playBuf(id){
+    if (!ctx) return;
     const s = ctx.createBufferSource(); s.buffer = buffers.get(id);
     s.connect(bus.sfx); s.start();
   }
@@ -370,22 +410,88 @@ const Sound = (() => {
       onProgress && onProgress(++done / manifest.length);
     }
   }
+  // เสียงจากเซิร์ฟเวอร์ใช้ชื่อสั้น ส่วนช่องไฟล์ใช้ชื่อยาว จับคู่กันตรงนี้
+  const SLOT = { stone:'sfx_stone', capture:'sfx_capture', pass:'sfx_pass',
+                 game_start:'sfx_start', game_end:'sfx_end', cut:'sfx_cut' };
   return {
-    unlock, preload, playBGM, stopBGM, buffers,
-    play: id => { if (!on) return; buffers.has(id) ? playBuf(id) : (SFX[id] && SFX[id]()); },
+    unlock, preload, playBGM, stopBGM, buffers, SLOT,
+    has: id => buffers.has(SLOT[id] || id),
+    play: id => {
+      if (!on) return;
+      const slot = SLOT[id] || id;
+      buffers.has(slot) ? playBuf(slot) : (SFX[id] && SFX[id]());
+    },
     toggle(){ on = !on; localStorage.setItem('gb_sound', on ? 'on' : 'off'); if (!on) stopBGM(); return on; },
     get isOn(){ return on; },
   };
 })();
-document.addEventListener('pointerdown', () => Sound.unlock(), { once:true });
+document.addEventListener('pointerdown', () => { Sound.unlock(); updateBGM(true); }, { once:true });
 const soundBtns = [$('btnSound'), $('btnSound2')];
 const paintSound = () => soundBtns.forEach(b => b.textContent = Sound.isOn ? '🔊' : '🔇');
-soundBtns.forEach(b => b.onclick = () => { Sound.toggle(); paintSound(); });
+soundBtns.forEach(b => b.onclick = () => { Sound.toggle(); paintSound(); updateBGM(true); });
 paintSound();
+
+/* ── เติมข้อความทุกจุดตามภาษาที่เลือก ──
+ * ทุกข้อความในหน้าต้องผ่านตรงนี้ จึงไม่มีคำค้างภาษาเดิมเวลาสลับภาษา
+ */
+function applyLang(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = T(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    el.placeholder = T(el.dataset.i18nPh);
+  });
+  document.querySelectorAll('.komi').forEach(el => {
+    el.textContent = T('home.komi', { n: el.dataset.komi });
+  });
+  $('btnLang').textContent = LANG.toUpperCase();
+  $('copyLbl').textContent = T('game.codeBtn');
+  const size = document.querySelector('#sizeChips .chip.on');
+  if (size) $('sizeHint').textContent = T('home.sizeHint' + size.dataset.size);
+  paintNet();
+  if (view) applyState(view);
+  else if (myGor != null) paintMyRank();
+}
+
+function setLang(lang){
+  if (!LANG_ORDER.includes(lang)) return;
+  LANG = lang;
+  localStorage.setItem('gb_lang', lang);
+  applyLang();
+}
+$('btnLang').onclick = () => setLang(LANG_ORDER[(LANG_ORDER.indexOf(LANG) + 1) % LANG_ORDER.length]);
+
+/* ── ไฟล์เสียงที่ผู้กำกับอัปโหลดไว้ ──
+ * เซิร์ฟเวอร์ส่งรายการมาให้ตอนเชื่อมต่อ และส่งใหม่ทุกครั้งที่มีการเปลี่ยนไฟล์
+ * ทุกเครื่องโหลดไฟล์เองแล้วเล่นจากเครื่องตัวเอง ไม่มีการสตรีมเสียงข้ามเครื่อง
+ */
+let audioManifest = null, bgmNow = null;
+async function applyManifest(mf){
+  audioManifest = mf;
+  const list = (mf.assets || []).filter(a => a.url).map(a => ({ id:a.id, url:a.url }));
+  if (!list.length) return;
+  try { await Sound.preload(list); } catch (e) { console.warn('preload', e); }
+  updateBGM(true);
+}
+function updateBGM(force){
+  if (!Sound.isOn) { Sound.stopBGM(); bgmNow = null; return; }
+  const st = view && view.state;
+  let want = 'bgm_lobby';
+  if (st === 'playing') want = 'bgm_play';
+  else if (st === 'finished') want = 'bgm_result';
+  if (st === 'playing' && clockBase){
+    const c = clockBase.clocks[clockBase.turn === 1 ? 'black' : 'white'];
+    if (c && c.main === 0) want = 'bgm_tense';
+  }
+  if (!Sound.buffers.has(want)) want = Sound.buffers.has('bgm_lobby') ? 'bgm_lobby' : null;
+  if (!want){ Sound.stopBGM(); bgmNow = null; return; }
+  if (want !== bgmNow || force){ bgmNow = want; Sound.playBGM(want); }
+}
 
 /* ═══════════ สถานะฝั่งเบราว์เซอร์ ═══════════ */
 let ws = null, myColor = null, view = null, boardSize = 9;
-let accessToken = null, myGor = null;
+let accessToken = null, myGor = null, myProvisional = false, isGuest = false;
 let playerToken = localStorage.getItem('gb_token') || null;
 let ghost = null;        // ตาที่เลือกไว้แต่ยังไม่ยืนยัน
 let clockBase = null;
@@ -401,85 +507,152 @@ document.querySelectorAll('[data-tab]').forEach(c => c.onclick = () => {
   $('tabSignup').classList.toggle('hidden', c.dataset.tab !== 'signup');
 });
 
-$('suYear').oninput = () => {
-  const y = parseInt($('suYear').value, 10);
-  const age = (new Date().getFullYear() + 543) - y;
-  $('guardianWrap').classList.toggle('hidden', !(y > 2400 && age < 13));
-};
+/* ── ระบบสมาชิกแบบ "ชื่อผู้ใช้ + รหัสผ่าน" ไม่ต้องใช้อีเมล ──
+ * Supabase Auth บังคับให้มีอีเมล เราจึงแปลงชื่อผู้ใช้เป็นอีเมลภายในให้อัตโนมัติ
+ * ผู้ใช้ไม่เห็นและไม่ต้องรู้เรื่องนี้เลย
+ * ต้องไปปิด "Confirm email" ใน Supabase ก่อน ไม่งั้นสมัครแล้วเข้าใช้ไม่ได้
+ */
+const USER_DOMAIN = 'gobattle.local';
+const toEmail = u => u.trim().toLowerCase() + '@' + USER_DOMAIN;
+const USER_RE  = /^[a-z0-9_]{3,20}$/;
+
+function authErrText(err){
+  const m = String(err && err.message || err || '').toLowerCase();
+  if (m.includes('already registered') || m.includes('already been registered')
+      || m.includes('duplicate')) return T('err.taken');
+  if (m.includes('invalid login')) return T('err.wrongLogin');
+  if (m.includes('email not confirmed')) return T('err.notConfirmed');
+  if (m.includes('password')) return T('err.passwordShort');
+  if (m.includes('invalid') && m.includes('email')) return T('err.usernameBad');
+  if (m.includes('fetch') || m.includes('network')) return T('err.network');
+  return T('err.signupFailed');
+}
 
 $('btnSignup').onclick = async () => {
   $('authErr').textContent = '';
-  if (!sb) return $('authErr').textContent = 'ยังไม่ได้ตั้งค่า Supabase ในไฟล์ index.html';
-  const name = $('suName').value.trim(), email = $('suEmail').value.trim(), pass = $('suPass').value;
-  const yearBE = parseInt($('suYear').value, 10);
-  const age = (new Date().getFullYear() + 543) - yearBE;
-  if (name.length < 2) return $('authErr').textContent = 'ชื่อที่ใช้แสดงต้องยาวอย่างน้อย 2 ตัวอักษร';
-  if (pass.length < 6) return $('authErr').textContent = 'รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร';
-  if (yearBE > 2400 && age < 13 && !$('suGuardian').value.trim())
-    return $('authErr').textContent = 'ผู้ที่อายุต่ำกว่า 13 ปี ต้องกรอกอีเมลผู้ปกครอง';
+  if (!sb) return $('authErr').textContent = T('err.dbNotReady');
+  const user = $('suUser').value.trim().toLowerCase();
+  const name = $('suName').value.trim() || user;
+  const pass = $('suPass').value;
+  if (!USER_RE.test(user)) return $('authErr').textContent = T('err.usernameBad');
+  if (pass.length < 6)     return $('authErr').textContent = T('err.passwordShort');
 
-  const { data, error } = await sb.auth.signUp({
-    email, password: pass, options: { data: { display_name: name } },
-  });
-  if (error) return $('authErr').textContent = error.message;
-  if (data.user){
-    if (yearBE > 2400) {
-      await sb.from('profiles').update({
-        birth_year: yearBE - 543,
-        guardian_email: $('suGuardian').value.trim() || null,
-      }).eq('id', data.user.id);
+  $('btnSignup').disabled = true; $('btnSignup').textContent = T('auth.signingUp');
+  try {
+    const { data, error } = await sb.auth.signUp({
+      email: toEmail(user), password: pass,
+      options: { data: { display_name: name, username: user } },
+    });
+    if (error) throw error;
+
+    if (!data.session){
+      $('authErr').textContent = T('err.noSession');
+      return;
     }
     const gor = +$('suRank').value;
-    for (const size of [9, 13, 19]) {
+    for (const size of [9, 13, 19]){
       await sb.from('ratings').upsert({ user_id: data.user.id, board_size: size, gor, peak_gor: gor });
     }
+    await afterLogin(data.session);
+  } catch (e){
+    $('authErr').textContent = authErrText(e);
+  } finally {
+    $('btnSignup').disabled = false; $('btnSignup').textContent = T('auth.signup');
   }
-  if (!data.session) return toast('สมัครเรียบร้อย — กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ');
-  afterLogin(data.session);
 };
 
 $('btnLogin').onclick = async () => {
   $('authErr').textContent = '';
-  if (!sb) return $('authErr').textContent = 'ยังไม่ได้ตั้งค่า Supabase ในไฟล์ index.html';
-  const { data, error } = await sb.auth.signInWithPassword({
-    email: $('liEmail').value.trim(), password: $('liPass').value,
-  });
-  if (error) return $('authErr').textContent = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
-  afterLogin(data.session);
-};
+  if (!sb) return $('authErr').textContent = T('err.dbNotReady');
+  const user = $('liUser').value.trim().toLowerCase();
+  const pass = $('liPass').value;
+  if (!user || !pass) return $('authErr').textContent = T('err.fillBoth');
 
-$('btnGuest').onclick  = () => { accessToken = null; connect('ผู้มาเยือน'); };
-$('btnLogout').onclick = async () => { if (sb) await sb.auth.signOut(); location.reload(); };
+  $('btnLogin').disabled = true; $('btnLogin').textContent = T('auth.loggingIn');
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email: toEmail(user), password: pass });
+    if (error) throw error;
+    await afterLogin(data.session);
+  } catch (e){
+    $('authErr').textContent = authErrText(e);
+  } finally {
+    $('btnLogin').disabled = false; $('btnLogin').textContent = T('auth.login');
+  }
+};
+$('liPass').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnLogin').click(); });
+$('suPass').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnSignup').click(); });
+
+$('btnGuest').onclick  = () => { accessToken = null; isGuest = true; connect(null); };
+$('btnLogout').onclick = async () => { try { if (sb) await sb.auth.signOut(); } catch {} location.reload(); };
 
 async function afterLogin(session){
   accessToken = session.access_token;
-  const { data: p } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
-  const { data: r } = await sb.from('ratings').select('*').eq('user_id', session.user.id).eq('board_size', 19);
-  myGor = r && r[0] ? r[0].gor : null;
-  $('meName').textContent = (p && p.display_name) || 'ผู้เล่น';
-  $('meRank').textContent = myGor != null
-    ? `${gorLabel(myGor)} ในระบบ${r[0].is_provisional ? ' (ยังทดลอง)' : ''}`
-    : 'ยังไม่มีดั้ง';
-  connect(p && p.display_name);
+  let name = null;
+  try {
+    const { data: p } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
+    const { data: r } = await sb.from('ratings').select('*').eq('user_id', session.user.id).eq('board_size', 19);
+    myGor = r && r[0] ? r[0].gor : null;
+    myProvisional = !!(r && r[0] && r[0].is_provisional);
+    name = p && p.display_name;
+    paintMyRank();
+  } catch (e){
+    $('meRank').textContent = T('err.rankRead');
+  }
+  $('meName').textContent = name || T('auth.username');
+  connect(name);
 }
-const gorLabel = g => g == null ? '—'
-  : g >= 2100 ? `${Math.min(9, Math.floor((g - 2000) / 100))} ดั้ง`
-              : `${Math.min(30, Math.max(1, Math.ceil((2100 - g) / 100)))} คิว`;
 
-if (sb) sb.auth.getSession().then(({ data }) => { if (data.session) afterLogin(data.session); });
+function paintMyRank(){
+  if (isGuest) { $('meRank').textContent = T('home.guestRank'); return; }
+  if (myGor == null) { $('meRank').textContent = T('home.noRank'); return; }
+  $('meRank').textContent = myProvisional
+    ? T('home.provisional', { rank: gorLabel(myGor) })
+    : T('home.rated', { rank: gorLabel(myGor) });
+}
+
+if (sb) {
+  sb.auth.getSession()
+    .then(({ data }) => { if (data && data.session) afterLogin(data.session); })
+    .catch(() => {});
+}
+
+/* ── บอกสถานะให้เห็นบนหน้าจอ ว่าอะไรพร้อมหรือไม่พร้อม ── */
+let netExtra = '';
+function paintNet(extra){
+  if (extra !== undefined) netExtra = extra;
+  const parts = [
+    sb ? T('home.netDb') : T('home.netDbNo'),
+    GoGame ? T('home.netEngine') : T('home.netEngineNo'),
+  ];
+  if (netExtra) parts.push(netExtra);
+  const el = $('netStatus'); if (el) el.textContent = parts.join(' · ');
+}
+applyLang();
 if (localStorage.getItem('gb_helped')) $('firstTime').classList.add('hidden');
 $('btnDismissHelp').onclick = () => { localStorage.setItem('gb_helped','1'); $('firstTime').classList.add('hidden'); };
 
 /* ═══════════ WebSocket ═══════════ */
 let retry = 0, pendingRoom = null;
 function connect(name){
-  ws = new WebSocket(CONFIG.SERVER_URL);
-  ws.onopen = () => { retry = 0; ws.send(JSON.stringify({ t:'auth', accessToken, name, playerToken })); };
+  paintNet(T('home.netSrvConnecting'));
+  try { ws = new WebSocket(CONFIG.SERVER_URL); }
+  catch (e){ return fatal('WebSocket: ' + e.message); }
+
+  ws.onopen = () => {
+    retry = 0;
+    paintNet(T('home.netSrvOk'));
+    ws.send(JSON.stringify({ t:'auth', accessToken, name, playerToken }));
+  };
+  ws.onerror = () => paintNet(T('home.netSrvFail'));
   ws.onclose = () => {
-    $('statusBar').textContent = 'หลุดการเชื่อมต่อ — กำลังต่อใหม่…';
+    const el = $('statusBar'); if (el) el.textContent = T('game.disconnected');
+    paintNet(T('home.netSrvLost'));
     setTimeout(() => connect(name), Math.min(8000, 800 * ++retry));
   };
-  ws.onmessage = e => onMessage(JSON.parse(e.data));
+  ws.onmessage = e => {
+    try { onMessage(JSON.parse(e.data)); }
+    catch (err){ console.error('ข้อความจากเซิร์ฟเวอร์ผิดรูปแบบ', err); }
+  };
 }
 const sendWs = o => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
 
@@ -487,8 +660,8 @@ function onMessage(m){
   switch (m.t){
     case 'welcome':
       playerToken = m.playerToken; localStorage.setItem('gb_token', playerToken);
-      if ($('meName').textContent === '—') $('meName').textContent = m.name;
-      if (m.guest) $('meRank').textContent = 'ผู้มาเยือน — ไม่คิดดั้ง';
+      if (!$('meName').textContent || $('meName').textContent === '—') $('meName').textContent = m.name;
+      if (m.guest) { isGuest = true; paintMyRank(); }
       if (!m.dbOn) console.info('เซิร์ฟเวอร์ยังไม่ได้เชื่อม Supabase — เล่นได้แต่ไม่บันทึกผล');
       if (pendingRoom){ sendWs({ t:'join', code: pendingRoom }); pendingRoom = null; }
       else show('scHome');
@@ -497,49 +670,46 @@ function onMessage(m){
       myColor = m.color; ghost = null; show('scGame');
       $('gCode').textContent = m.code;
       history.replaceState(null, '', '#' + m.code);
-      if (m.spectator)   toast('ที่นั่งเต็มแล้ว — เข้าชมในฐานะผู้ชม');
-      if (m.reconnected) toast('กลับเข้าเกมเรียบร้อย');
+      if (m.spectator)   toast(T('game.spectatorJoined'));
+      if (m.reconnected) toast(T('game.reconnected'));
       break;
+    case 'manifest': applyManifest(m); break;
     case 'state': applyState(m); break;
     case 'end':   applyState(m); showEnd(m); break;
     case 'sfx':   Sound.play(m.id); break;
     case 'emoji': toast((m.from || '') + ' ' + m.id); break;
-    case 'error': toast(m.msg); Sound.play('illegal'); shake(); break;
+    case 'error': toast(m.code ? T('srv.' + m.code) : m.msg); Sound.play('illegal'); shake(); break;
   }
 }
 const shake = () => { const c = $('board'); c.classList.add('shake'); setTimeout(() => c.classList.remove('shake'), 320); };
 
 /* ═══════════ ปุ่มหน้าแรก ═══════════ */
-const SIZE_HINT = {
-  9:  '9×9 จบเร็วราว 10 นาที เหมาะกับผู้เริ่มต้นและการถ่ายทอดสด',
-  13: '13×13 ใช้เวลาราว 25 นาที เป็นขนาดที่สมาคมฯ ใช้กับระดับ 9–12 คิว',
-  19: '19×19 ขนาดมาตรฐานการแข่งขัน ใช้เวลานาน เหมาะกับผู้ที่ชำนาญแล้ว',
-};
 document.querySelectorAll('#sizeChips .chip').forEach(c => c.onclick = () => {
   document.querySelectorAll('#sizeChips .chip').forEach(x => x.classList.remove('on'));
   c.classList.add('on');
-  $('sizeHint').textContent = SIZE_HINT[c.dataset.size];
+  $('sizeHint').textContent = T('home.sizeHint' + c.dataset.size);
 });
 const chosenSize = () => +document.querySelector('#sizeChips .chip.on').dataset.size;
 const chosenTime = () => { const [m,b,p] = $('selTime').value.split(',').map(Number); return { main:m, byoyomi:b, periods:p }; };
 
 $('btnCreate').onclick = () => sendWs({ t:'create', size:chosenSize(), timeRule:chosenTime() });
 $('btnAI').onclick = () => {
-  const [id, name, strength, gor] = $('selAI').value.split('|');
+  const [id, strength, gor] = $('selAI').value.split('|');
+  const name = T('ai.' + id).split('·')[0].trim();
   sendWs({ t:'create', size:chosenSize(), timeRule:chosenTime(), vsAI:true,
            ai:{ id, name, strength:+strength, gor:+gor } });
 };
 $('btnJoin').onclick = () => {
   const code = $('inCode').value.trim().toUpperCase();
-  if (code.length === 6) sendWs({ t:'join', code }); else toast('รหัสห้องมี 6 ตัวอักษร');
+  if (code.length === 6) sendWs({ t:'join', code }); else toast(T('home.codeLen'));
 };
 $('inCode').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnJoin').click(); });
 if (location.hash.length === 7) pendingRoom = location.hash.slice(1).toUpperCase();
 
 /* ═══════════ ปุ่มในเกม ═══════════ */
 $('btnReady').onclick      = () => sendWs({ t:'ready', value:true });
-$('btnPass').onclick       = () => { if (confirm('ผ่านตานี้? ถ้าอีกฝ่ายผ่านต่อ เกมจะจบและเข้าสู่การนับแต้ม')) sendWs({ t:'pass' }); };
-$('btnResign').onclick     = () => { if (confirm('ยืนยันยอมแพ้?')) sendWs({ t:'resign' }); };
+$('btnPass').onclick       = () => { if (confirm(T('game.confirmPass'))) sendWs({ t:'pass' }); };
+$('btnResign').onclick     = () => { if (confirm(T('game.confirmResign'))) sendWs({ t:'resign' }); };
 $('btnConfirm').onclick    = () => sendWs({ t:'confirm_score' });
 $('btnResume').onclick     = () => sendWs({ t:'resume_play' });
 $('btnCancelMove').onclick = () => { ghost = null; paintBars(); paintStatus(); draw(); };
@@ -548,11 +718,12 @@ $('btnLeave').onclick      = () => { location.hash = ''; location.reload(); };
 $('btnHome').onclick       = () => { location.hash = ''; location.reload(); };
 $('btnCopy').onclick = async () => {
   const code = $('gCode').textContent;
-  try { await navigator.clipboard.writeText(location.origin + '/#' + code); toast('คัดลอกลิงก์ห้องแล้ว'); }
-  catch { toast('รหัสห้องคือ ' + code); }
+  try { await navigator.clipboard.writeText(location.origin + '/#' + code); toast(T('game.copied')); }
+  catch { toast(T('game.codeIs', { code })); }
 };
 $('btnSGF').onclick = () => {
   if (!localGame) return;
+  if (!localGame) return toast(T('game.sgfFail'));
   const sgf = localGame.toSGF({ event:'Go Battle Live', date:new Date().toISOString().slice(0,10) });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([sgf], { type:'application/x-go-sgf' }));
@@ -565,11 +736,13 @@ function applyState(m){
   clockBase = { at: Date.now(), clocks: m.clocks, turn: m.game.turn };
 
   // สำเนาเกมฝั่งเบราว์เซอร์ ใช้ตรวจกติกาและคำนวณพื้นที่โดยไม่ต้องรอเซิร์ฟเวอร์
-  localGame = new GoGame({ size: m.game.size, komi: m.game.komi });
-  localGame.board.set(m.game.board);
-  localGame.turn = m.game.turn;
-  localGame.koPoint = m.game.koPoint;
-  localGame.state = 'playing';
+  if (GoGame){
+    localGame = new GoGame({ size: m.game.size, komi: m.game.komi });
+    localGame.board.set(m.game.board);
+    localGame.turn = m.game.turn;
+    localGame.koPoint = m.game.koPoint;
+    localGame.state = 'playing';
+  }
 
   // มุมมอง: ฝ่ายเรา (หรือดำถ้าเป็นผู้ชม) อยู่ด้านล่างเสมอ
   const meIsWhite = myColor === 'W';
@@ -580,16 +753,16 @@ function applyState(m){
   $('pBot').classList.toggle('turn', m.state === 'playing' && m.game.turn === (meIsWhite ? 2 : 1));
   $('onAirBadge').classList.toggle('hidden', !m.onAir);
 
-  paintBars(); paintStatus(); draw();
+  paintBars(); paintStatus(); draw(); updateBGM();
 }
 
 function paintCard(pos, p, colorNum, m){
   $(pos+'Dot').className = 'dot ' + (colorNum === 1 ? 'b' : 'w');
   $(pos+'Name').textContent = p
-    ? p.name + (p.ai ? ' 🤖' : '') + (!p.ai && p.online === false ? ' (หลุด)' : '')
-    : 'รอผู้เล่น';
+    ? p.name + (p.ai ? ' 🤖' : '') + (!p.ai && p.online === false ? ' ' + T('game.offline') : '')
+    : T('game.waitingPlayer');
   $(pos+'Sub').textContent = p ? p.rank : '—';
-  $(pos+'Cap').textContent = 'เชลย ' + (colorNum === 1 ? m.game.prisoners.black : m.game.prisoners.white);
+  $(pos+'Cap').textContent = T('game.prisoners', { n: colorNum === 1 ? m.game.prisoners.black : m.game.prisoners.white });
 }
 
 function paintBars(){
@@ -601,7 +774,7 @@ function paintBars(){
   $('barMark').classList.toggle('hidden', s !== 'marking');
   $('barEnd').classList.toggle('hidden', s !== 'finished');
   const ready = view && (myColor === 'B' ? view.ready.black : view.ready.white);
-  $('btnReady').textContent = ready ? 'พร้อมแล้ว ✓ รออีกฝ่าย' : 'พร้อมแล้ว';
+  $('btnReady').textContent = ready ? T('game.readyWait') : T('game.ready');
   $('btnReady').disabled = !!ready || !myColor;
   $('btnPass').disabled = !myTurn;
   $('btnResign').disabled = !myColor;
@@ -611,34 +784,38 @@ function paintStatus(){
   const st = $('statusBar'), m = view; if (!m) return;
   st.classList.remove('calm');
   if (m.state === 'waiting'){
-    st.innerHTML = `รอคู่แข่ง — กดปุ่ม <b>รหัส ${m.code}</b> มุมขวาบนเพื่อคัดลอกลิงก์ส่งให้เพื่อน`;
+    st.textContent = T('game.statusWaiting', { code: m.code });
     st.classList.add('calm');
   } else if (m.state === 'ready'){
-    st.textContent = 'อีกฝ่ายเข้ามาแล้ว — กด “พร้อมแล้ว” ทั้งคู่เพื่อเริ่มเกม';
+    st.textContent = T('game.statusReady');
     st.classList.add('calm');
   } else if (m.state === 'playing'){
     const myTurn = myColor && m.game.turn === (myColor === 'B' ? 1 : 2);
     st.textContent = myColor
-      ? (myTurn ? (ghost ? 'ตรวจดูตำแหน่งแล้วกด “วางตรงนี้”' : 'ตาของคุณ — แตะกระดานเพื่อเลือกจุด')
-                : 'รออีกฝ่ายเดิน…')
-      : `กำลังชม · ${m.game.turn === 1 ? 'ตาดำ' : 'ตาขาว'} ตาที่ ${m.game.moveCount}`;
+      ? (myTurn ? (ghost ? T('game.statusConfirm') : T('game.statusYourTurn'))
+                : T('game.statusWaitOther'))
+      : T('game.statusSpectate', {
+          turn: m.game.turn === 1 ? T('game.turnBlack') : T('game.turnWhite'),
+          n: m.game.moveCount });
     if (!myTurn) st.classList.add('calm');
   } else if (m.state === 'marking'){
     const mine = myColor === 'B' ? m.confirms.black : m.confirms.white;
-    st.textContent = mine ? 'คุณยืนยันแล้ว — รออีกฝ่ายยืนยัน' : 'ทำเครื่องหมายหมากที่ตายแล้ว จากนั้นกดยืนยัน';
+    st.textContent = mine ? T('game.statusMarkMine') : T('game.statusMark');
   }
 }
 
 function showEnd(m){
   const r = m.result, s = m.score || r.score;
-  const who = r.type === 'black_win' ? 'ดำชนะ' : r.type === 'white_win' ? 'ขาวชนะ'
-            : r.type === 'draw' ? 'เสมอ' : 'ไม่มีผลแพ้ชนะ';
+  const who = r.type === 'black_win' ? T('end.blackWin') : r.type === 'white_win' ? T('end.whiteWin')
+            : r.type === 'draw' ? T('end.draw') : T('end.noResult');
   $('endTitle').textContent = `${who} · ${r.text}`;
+  const REASON = { resign:'end.reasonResign', timeout:'end.reasonTimeout',
+                   forfeit:'end.reasonForfeit', repeat:'end.reasonRepeat' };
   $('endDetail').innerHTML = s
-    ? `<b>ดำ ${s.black}</b> = พื้นที่ ${s.territory.black} + เชลย ${s.prisoners.black}<br>`
-    + `<b>ขาว ${s.white}</b> = พื้นที่ ${s.territory.white} + เชลย ${s.prisoners.white} + โคมิ ${s.komi}<br>`
-    + `<span style="color:var(--muted)">ดาเมะ ${s.dameCount} จุด ไม่นับเป็นแต้มของฝ่ายใด (กติกาญี่ปุ่น)</span>`
-    : (r.reason || '');
+    ? `<b>${T('end.detailBlack', { total:s.black, terr:s.territory.black, pris:s.prisoners.black })}</b><br>`
+    + `<b>${T('end.detailWhite', { total:s.white, terr:s.territory.white, pris:s.prisoners.white, komi:s.komi })}</b><br>`
+    + `<span style="color:var(--muted)">${T('end.dame', { n:s.dameCount })}</span>`
+    : (r.reasonCode ? T(REASON[r.reasonCode] || 'end.noResult') : (r.reason || ''));
   paintBars();
 }
 
@@ -794,16 +971,16 @@ cv.addEventListener('click', ev => {
   const p = pointAt(ev); if (!p) return;
 
   if (view.state === 'marking'){
-    if (view.game.board[p.y * boardSize + p.x] === 0) return toast('แตะที่ตัวหมาก ไม่ใช่จุดว่าง');
+    if (view.game.board[p.y * boardSize + p.x] === 0) return toast(T('game.tapStone'));
     sendWs({ t:'toggle_dead', x:p.x, y:p.y });
     return;
   }
   if (view.state !== 'playing' || !myColor) return;
-  if (view.game.turn !== (myColor === 'B' ? 1 : 2)) return toast('ยังไม่ถึงตาของคุณ');
+  if (view.game.turn !== (myColor === 'B' ? 1 : 2)) return toast(T('game.notYourTurn'));
 
   // ตรวจกติกาทันทีฝั่งเบราว์เซอร์ — ไม่ต้องรอเซิร์ฟเวอร์ตอบ
   const reason = localGame && localGame.illegalReason(p.x, p.y, myColor === 'B' ? 1 : 2);
-  if (reason){ toast(reason); Sound.play('illegal'); shake(); return; }
+  if (reason){ toast(T('srv.' + reason)); Sound.play('illegal'); shake(); return; }
 
   if (!isTouch){ sendWs({ t:'play', x:p.x, y:p.y }); return; }
   ghost = p; paintBars(); paintStatus(); draw();
@@ -826,7 +1003,7 @@ setInterval(() => {
       node.classList.remove('pulse');
     } else {
       const left = Math.max(0, (c.byoyomi || 0) - live);
-      node.textContent = `${Math.ceil(left/1000)} วิ · ${c.periods} รอบ`;
+      node.textContent = T('game.byoyomi', { s: Math.ceil(left/1000), p: c.periods });
       node.classList.add('warn');
       node.classList.toggle('pulse', clockBase.turn === num);
       if (clockBase.turn === num && myColor && num === (myColor === 'B' ? 1 : 2)){
