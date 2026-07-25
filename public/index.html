@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#161311">
+<meta name="theme-color" content="#f5f2eb">
 <title>Go Battle Live — หมากล้อมออนไลน์</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -95,6 +95,7 @@ canvas{width:100%; height:auto; display:block; border-radius:12px; touch-action:
 @keyframes fade{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){*{animation:none !important}}
 </style>
+<link rel="stylesheet" href="/ui-light.css">
 </head>
 <body>
 <div id="app">
@@ -107,6 +108,7 @@ canvas{width:100%; height:auto; display:block; border-radius:12px; touch-action:
       <h1 style="font-size:1.25rem;line-height:1.2">Go Battle Live</h1>
       <div class="hint" data-i18n="app.tagline"></div>
     </div>
+    <button class="btn-ghost btn-sm lang-toggle" type="button" aria-label="Language">TH</button>
   </div>
 
   <div class="card">
@@ -168,7 +170,7 @@ canvas{width:100%; height:auto; display:block; border-radius:12px; touch-action:
       <div class="psub" id="meRank">—</div>
     </div>
     <button class="btn-ghost btn-sm" id="btnSound">🔊</button>
-    <button class="btn-ghost btn-sm" id="btnLang">TH</button>
+    <button class="btn-ghost btn-sm lang-toggle" id="btnLang" type="button" aria-label="Language">TH</button>
     <button class="btn-ghost btn-sm" id="btnLogout" data-i18n="home.logout"></button>
   </div>
 
@@ -233,6 +235,7 @@ canvas{width:100%; height:auto; display:block; border-radius:12px; touch-action:
       <span id="onAirBadge" class="onair hidden" data-i18n="game.onAir"></span>
     </div>
     <button class="btn-ghost btn-sm" id="btnSound2">🔊</button>
+    <button class="btn-ghost btn-sm lang-toggle" type="button" aria-label="Language">TH</button>
     <button class="btn-ghost btn-sm" id="btnCopy"><span id="copyLbl"></span> <span id="gCode" style="color:var(--kaya)">——</span></button>
   </div>
 
@@ -445,7 +448,10 @@ function applyLang(){
   document.querySelectorAll('.komi').forEach(el => {
     el.textContent = T('home.komi', { n: el.dataset.komi });
   });
-  $('btnLang').textContent = LANG.toUpperCase();
+  document.querySelectorAll('.lang-toggle').forEach(el => {
+    el.textContent = LANG.toUpperCase();
+    el.title = I ? I.LANG_NAMES[LANG] : LANG.toUpperCase();
+  });
   $('copyLbl').textContent = T('game.codeBtn');
   const size = document.querySelector('#sizeChips .chip.on');
   if (size) $('sizeHint').textContent = T('home.sizeHint' + size.dataset.size);
@@ -460,6 +466,10 @@ function setLang(lang){
   localStorage.setItem('gb_lang', lang);
   applyLang();
 }
+document.querySelectorAll('.lang-toggle').forEach(el => {
+  el.onclick = () => setLang(LANG_ORDER[(LANG_ORDER.indexOf(LANG) + 1) % LANG_ORDER.length]);
+});
+// Keep the named home control explicitly bound as well as the controls shared by every screen.
 $('btnLang').onclick = () => setLang(LANG_ORDER[(LANG_ORDER.indexOf(LANG) + 1) % LANG_ORDER.length]);
 
 /* ── ไฟล์เสียงที่ผู้กำกับอัปโหลดไว้ ──

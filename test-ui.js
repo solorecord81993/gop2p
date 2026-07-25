@@ -65,6 +65,8 @@ for (const file of PAGES) {
 
   // ---- 5b. ต้องโหลดพจนานุกรมสามภาษา ----
   ok('โหลด /i18n.js', html.includes('/i18n.js'));
+  ok('โหลดธีมสว่างและ responsive ร่วมกัน',
+     html.includes('/ui-light.css') && /name="viewport"/.test(html));
   if (file === 'live.html') {
     ok('มีระบบพูดออกเสียงข้อความ MC',
        script.includes('SpeechSynthesisUtterance') && script.includes('Speech.say'));
@@ -78,6 +80,9 @@ for (const file of PAGES) {
     ok('คีย์ถูกปิดบังตอนพิมพ์', /id="inGroq"[^>]*type="password"/.test(html));
     ok('ส่งรหัสผู้กำกับไปกับทุกคำขอ', script.includes('x-director-token'));
     ok('อัปโหลดไฟล์เสียงได้ และจำกัดชนิดไฟล์', script.includes("accept=") && script.includes('/api/audio/'));
+    ok('เลือกภาษาหน้าจอและภาษา MC แยกกันได้',
+       declared.has('uiLang') && declared.has('mcLang') &&
+       script.includes("$('uiLang').onchange") && script.includes("$('mcLang').onchange"));
   }
 
   // ---- 5d. หน้าเว็บต้องโหลดไฟล์เสียงที่อัปโหลดไว้ ----
