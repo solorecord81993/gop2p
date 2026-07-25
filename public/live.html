@@ -413,7 +413,8 @@ function connect(){
       const changed = m.code !== program;
       program = m.code;
       $('idle').classList.toggle('hidden', !!program);
-      if (changed && program) playTransition(m.transition || TRANSITION);
+      if (!program) resetLiveView();
+      else if (changed) playTransition(m.transition || TRANSITION);
     }
     if (m.t === 'state' || m.t === 'end') applyState(m);
     if (m.t === 'highlight') playCutscene(m);      // ค่ายกล — เห็นเฉพาะบนไลฟ์
@@ -432,6 +433,15 @@ function connect(){
 connect();
 
 let bgmNow = null;
+function resetLiveView(){
+  view = null;
+  clockBase = null;
+  localGame = null;
+  bgmNow = null;
+  Snd.stopBGM();
+  $('roomTag').textContent = '——';
+  $('mcText').textContent = T('mc.waiting');
+}
 async function applyManifest(mf){
   const list = (mf.assets || []).filter(a => a.url).map(a => ({ id:a.id, url:a.url }));
   if (!list.length) return;
