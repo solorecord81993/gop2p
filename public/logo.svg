@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title id="title">Go Live</title>
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff0a3"/><stop offset=".42" stop-color="#f4bd35"/><stop offset="1" stop-color="#9f5b00"/></linearGradient>
+    <linearGradient id="dark" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#30251d"/><stop offset="1" stop-color="#0b0908"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="5" stdDeviation="5" flood-opacity=".65"/></filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <rect x="35" y="16" width="186" height="164" rx="31" fill="url(#gold)" stroke="#ffda5d" stroke-width="5"/>
+    <g stroke="#704000" stroke-width="3" opacity=".8"><path d="M62 31v133M95 26v143M128 22v150M161 26v143M194 31v133M47 51h162M40 83h176M38 115h180M43 147h170"/></g>
+    <circle cx="104" cy="78" r="35" fill="#161310" stroke="#050403" stroke-width="5"/><circle cx="157" cy="91" r="35" fill="#fffbed" stroke="#c8bda5" stroke-width="5"/><circle cx="157" cy="91" r="11" fill="#ef2019"/>
+    <text x="128" y="164" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-size="82" font-weight="900" fill="url(#gold)" stroke="#21170f" stroke-width="9" paint-order="stroke">GO</text>
+    <rect x="22" y="166" width="212" height="68" rx="22" fill="url(#dark)" stroke="url(#gold)" stroke-width="6"/>
+    <rect x="38" y="181" width="52" height="38" rx="10" fill="#ed2119"/><path d="m57 190 22 10-22 11z" fill="#fff8ee"/>
+    <text x="101" y="215" font-family="Arial, sans-serif" font-size="43" font-weight="800" fill="#fffaf0">Live</text>
+    <g fill="none" stroke="#ff3026" stroke-width="6" stroke-linecap="round"><path d="M205 191q11 9 0 18"/><path d="M216 183q20 17 0 34"/></g>
+  </g>
+</svg>

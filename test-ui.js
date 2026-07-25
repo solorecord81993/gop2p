@@ -67,10 +67,13 @@ for (const file of PAGES) {
   ok('โหลด /i18n.js', html.includes('/i18n.js'));
   ok('โหลดธีมสว่างและ responsive ร่วมกัน',
      html.includes('/ui-light.css') && /name="viewport"/.test(html));
+  ok('แสดงโลโก้ Go Live', html.includes('src="/logo.svg"'));
   if (file === 'live.html') {
     ok('มีระบบพูดออกเสียงข้อความ MC',
        script.includes('SpeechSynthesisUtterance') && script.includes('Speech.say'));
     ok('ปลดล็อกเสียงพูดตอนกดปุ่มเริ่ม', script.includes('Speech.unlock()'));
+    ok('จอว่างมี QR ลิงก์ และคำเชิญของ MC',
+       declared.has('joinQr') && declared.has('joinLink') && declared.has('idleMcText'));
   }
 
   // ---- 5c. หน้าตั้งค่าของผู้กำกับ ----

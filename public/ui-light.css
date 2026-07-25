@@ -35,3 +35,5 @@ body:has(#panel){width:min(100%,1280px)!important;max-width:none!important;paddi
 @media(max-width:390px){.grid{grid-template-columns:1fr!important}}
 @media(orientation:landscape) and (max-height:620px) and (max-width:1000px){#scGame:not(.hidden){display:grid;grid-template-columns:minmax(190px,32vw) minmax(300px,1fr)}#scGame .boardwrap{grid-column:2;grid-row:1/span 8;max-height:calc(100vh - 24px)}#scGame canvas{width:auto;max-width:100%;height:calc(100vh - 24px)}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+/* Shared brand mark used in every application view. */
+.brand-logo{display:block;width:46px;height:46px;object-fit:contain;flex:none;filter:drop-shadow(0 3px 5px rgba(0,0,0,.22))}
