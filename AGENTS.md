@@ -2,7 +2,7 @@
 
 For every coding task:
 
-1. Start from the latest `origin/main`.
+1. Start from the latest 'gop2p/main'.
 2. Never commit or push directly to `main`.
 3. Create a new branch before modifying files.
 4. Use branch names in this format:
