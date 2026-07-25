@@ -71,6 +71,15 @@ for (const file of PAGES) {
     ok('มีระบบพูดออกเสียงข้อความ MC',
        script.includes('SpeechSynthesisUtterance') && script.includes('Speech.say'));
     ok('ปลดล็อกเสียงพูดตอนกดปุ่มเริ่ม', script.includes('Speech.unlock()'));
+    const reset = (script.match(/function resetLiveView\(\)\{([\s\S]*?)\n\}/) || [])[1] || '';
+    ok('program null ล้างสถานะของ live view',
+       script.includes('if (!program) resetLiveView()') &&
+       ['view = null', 'clockBase = null', 'localGame = null', 'bgmNow = null']
+         .every(statement => reset.includes(statement)));
+    ok('program null หยุด BGM และคืนข้อความรอถ่ายทอด',
+       reset.includes('Snd.stopBGM()') &&
+       reset.includes("$('roomTag').textContent = '——'") &&
+       reset.includes("$('mcText').textContent = T('mc.waiting')"));
   }
 
   // ---- 5c. หน้าตั้งค่าของผู้กำกับ ----
