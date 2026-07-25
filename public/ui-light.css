@@ -1,0 +1,35 @@
+:root{
+  --sumi:#f5f2eb!important;--sumi-2:#fff!important;--sumi-3:#f2eee6!important;
+  --panel:#fff!important;--line:#d9d1c4!important;--kaya:#b7791f!important;
+  --shell:#201c18!important;--shu:#b8322a!important;--shu-soft:#8e251e!important;
+  --matcha:#617b52!important;--muted:#736b62!important;color-scheme:light
+}
+html{background:#f5f2eb}
+body{background:radial-gradient(circle at 50% -15%,rgba(226,181,101,.22),transparent 32rem),#f5f2eb!important;color:var(--shell)!important}
+.card,.pcard,.deck,.tile,.mc{background:rgba(255,255,255,.94)!important;border-color:var(--line)!important;box-shadow:0 10px 28px rgba(54,43,30,.07)}
+.pcard.turn{background:#fff8ee!important}
+input,select,textarea,.btn-ghost,button:not(.btn-main):not(.btn-take){background:#fff!important;border-color:var(--line)!important;color:var(--shell)!important}
+input:focus,select:focus,textarea:focus{outline:3px solid rgba(184,50,42,.18)!important;border-color:var(--shu)!important}
+button{min-height:44px}.btn-main,.btn-take{background:var(--shu)!important;color:#fff!important;box-shadow:0 7px 18px rgba(184,50,42,.2)}
+.hint,.psub,.tag,.meta,.sub,.prank,.cap,.barlabel{color:var(--muted)!important}
+.status{background:#fff!important}.bar{background:linear-gradient(transparent,rgba(245,242,235,.96) 22%)!important}
+.toast{background:#28231f!important;color:#fff!important}canvas{box-shadow:0 12px 32px rgba(54,43,30,.16)!important}
+#app{width:min(100%,1180px)!important;max-width:none!important;margin-inline:auto!important;padding:clamp(12px,2vw,24px) clamp(12px,3vw,32px) calc(clamp(16px,2vw,28px) + var(--safe-b,0px))!important}
+#scAuth{width:min(100%,460px);margin:auto;padding-top:clamp(8px,8vh,72px)}
+#scHome{width:min(100%,780px);margin-inline:auto}#scGame{width:100%}
+#scGame:not(.hidden){display:grid;grid-template-columns:minmax(250px,340px) minmax(320px,720px);gap:clamp(12px,2vw,24px);align-items:start}
+#scGame .boardwrap{grid-column:2;grid-row:1/span 8;width:100%;max-width:min(72vh,720px);justify-self:center}
+#scGame>.pcard,#scGame>.status,#scGame>.bar,#scGame>.row{grid-column:1}
+#scGame canvas{max-height:calc(100vh - 48px);object-fit:contain}
+body:has(#panel){width:min(100%,1280px)!important;max-width:none!important;padding:clamp(12px,2.5vw,28px)!important}
+#panel>.row:first-child{position:sticky;top:8px;z-index:30;padding:10px 12px;background:rgba(245,242,235,.9);border:1px solid var(--line);border-radius:14px;backdrop-filter:blur(12px);flex-wrap:wrap}
+.decks{grid-template-columns:repeat(2,minmax(0,1fr))!important}.grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))!important}
+#settings{background:rgba(245,242,235,.96)!important;color:var(--shell)!important}
+#stage{background:radial-gradient(1200px 900px at 50% 42%,#fff7e8 0%,#eee8dd 74%),#f5f2eb!important;color:var(--shell)!important}
+#stage .pcard,#stage .mc{background:rgba(255,255,255,.93)!important}.idle,#boot{background:#f5f2eb!important;color:var(--shell)!important}
+#boot .b2{color:var(--muted)!important}.roomtag{background:rgba(255,255,255,.72)}
+@media(max-width:900px){#scGame:not(.hidden){display:flex;flex-direction:column}#scGame .boardwrap{order:2;width:100%;max-width:680px;align-self:center}.decks{grid-template-columns:1fr!important}}
+@media(max-width:640px){body{font-size:15px}#app{gap:9px!important}.card{padding:13px!important;border-radius:13px!important}.row{gap:7px!important}#scHome>.row:first-child{flex-wrap:wrap}.grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}body:has(#panel){padding:10px!important}#settings{padding:12px!important}}
+@media(max-width:390px){.grid{grid-template-columns:1fr!important}}
+@media(orientation:landscape) and (max-height:620px) and (max-width:1000px){#scGame:not(.hidden){display:grid;grid-template-columns:minmax(190px,32vw) minmax(300px,1fr)}#scGame .boardwrap{grid-column:2;grid-row:1/span 8;max-height:calc(100vh - 24px)}#scGame canvas{width:auto;max-width:100%;height:calc(100vh - 24px)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
