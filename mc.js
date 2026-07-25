@@ -40,6 +40,7 @@ const CFG = {
  * ===================================================================== */
 const CANNED = {
   th: {
+    invite: ['สแกน QR เข้ามาสร้างเกมและเล่นกับเพื่อนหรือ AI ได้เลยครับ', 'กดไลก์ กด Live และส่งของขวัญให้กำลังใจผู้เล่นของเราได้นะครับ'],
     idle: [
       'บรรยากาศกำลังตึงเครียดขึ้นเรื่อย ๆ ครับ',
       'ทั้งสองฝ่ายกำลังชั่งใจกันอยู่ครับ',
@@ -58,6 +59,7 @@ const CANNED = {
     cut:     ['โอ้โห ตานี้คือค่ายกลของแท้ครับ!', 'สวยมากครับ! ตานี้คือของจริง!'],
   },
   en: {
+    invite: ['Scan the QR code to create a game and play with friends or AI.', 'Tap like, go Live, or send a gift to cheer on our players.'],
     idle: [
       'The tension keeps building here.',
       'Both players are weighing their options.',
@@ -76,6 +78,7 @@ const CANNED = {
     cut:     ['Oh, that is a genuine tesuji!', 'Beautiful! That is the real thing!'],
   },
   ja: {
+    invite: ['QRコードを読み取って、友達やAIと対局しましょう。', 'いいね、Live、ギフトで対局者を応援してください。'],
     idle: [
       '緊張感が高まってきました。',
       '両者とも慎重に読んでいます。',
@@ -216,7 +219,14 @@ class MCEngine {
       const now = Date.now();
       let text = null;
 
-      if (CFG.groqKey && now > this.failUntil.groq) {
+      // With no game on air, only use the curated invitation copy. Sending a
+      // dummy board to an AI made it commentate matches that had already ended.
+      if (kind === 'invite') {
+        text = pickCanned(this.lang, kind, this.lastText);
+        this.source = 'canned';
+      }
+
+      if (!text && CFG.groqKey && now > this.failUntil.groq) {
         try {
           text = await callOpenAICompatible(
             'https://api.groq.com/openai/v1/chat/completions',

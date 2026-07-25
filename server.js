@@ -526,7 +526,8 @@ setInterval(() => {
   autoPickRoom();
   if (mcAuto && liveViewers.size && mc.idle(now)) {
     const r = programRoom && rooms.get(programRoom);
-    mcSpeak(r && r.state === 'playing' ? 'idle' : 'idle');
+    // No selected room means an invitation screen, never commentary about an old match.
+    mcSpeak(r && r.state === 'playing' ? 'idle' : (r ? 'idle' : 'invite'));
   }
   for (const room of rooms.values()) {
     if (room.state === 'playing' && room.turnStartedAt) {
@@ -880,7 +881,7 @@ async function handle(ws, m) {
       send(ws, { t: 'mc_info', lang: mc.lang, auto: mcAuto, hasAI: mc.hasAI });
       const room = programRoom && rooms.get(programRoom);
       if (room) send(ws, { t: 'state', ...publicState(room) });
-      mcSpeak('idle', {}, true);
+      mcSpeak(room ? 'idle' : 'invite', {}, true);
       return;
     }
 
