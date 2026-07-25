@@ -47,6 +47,7 @@ button:disabled{opacity:.35;cursor:not-allowed}
 .sw{display:flex;align-items:center;gap:8px;font-size:.87rem}
 @media(max-width:640px){.decks{grid-template-columns:1fr}}
 </style>
+<link rel="stylesheet" href="/ui-light.css">
 </head>
 <body>
 
@@ -67,10 +68,15 @@ button:disabled{opacity:.35;cursor:not-allowed}
 <section id="panel" class="hidden">
   <div class="row" style="margin-bottom:14px">
     <h1 class="grow" style="font-size:1.2rem" data-i18n="dir.title"></h1>
-    <select id="mcLang" style="background:var(--sumi-3);border:1px solid var(--line);color:var(--shell);
+    <select id="uiLang" aria-label="Interface language" style="background:var(--sumi-3);border:1px solid var(--line);color:var(--shell);
         border-radius:9px;padding:7px 10px;font:inherit;font-size:.8rem;width:auto">
       <option value="th">ไทย</option><option value="en">English</option><option value="ja">日本語</option>
     </select>
+    <label class="sw"><span data-i18n="set.mcLangLabel"></span>
+    <select id="mcLang" style="background:var(--sumi-3);border:1px solid var(--line);color:var(--shell);
+        border-radius:9px;padding:7px 10px;font:inherit;font-size:.8rem;width:auto">
+      <option value="th">ไทย</option><option value="en">English</option><option value="ja">日本語</option>
+    </select></label>
     <label class="sw" style="font-size:.8rem"><input type="checkbox" id="mcAuto" checked style="width:auto"> <span data-i18n="dir.mcAuto"></span></label>
     <span class="tag" id="clock">—</span>
     <span class="tag"><span data-i18n="dir.allRooms"></span> <b id="nRooms">0</b></span>
@@ -216,6 +222,7 @@ $('btnEnter').onclick = () => {
 };
 $('tok').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnEnter').click(); });
 $('mcLang').value = LANG;
+$('uiLang').value = LANG;
 applyLang();
 
 function connect(){
@@ -262,11 +269,13 @@ function syncWatch(){
    จึงยังทำงานต่อแม้ปิดหน้าเบื้องหลังไปแล้ว — สำคัญมากตอนถ่ายทอดด้วยมือถือ */
 $('autoMode').onchange = () => ws.send(JSON.stringify({ t:'auto', value: $('autoMode').checked }));
 $('mcAuto').onchange   = () => ws.send(JSON.stringify({ t:'mc_auto', value: $('mcAuto').checked }));
-$('mcLang').onchange   = () => {
-  LANG = $('mcLang').value;                       // ภาษาของหน้านี้ตามภาษาที่ให้ MC พูด
+$('uiLang').onchange   = () => {
+  LANG = $('uiLang').value;
   localStorage.setItem('gb_lang', LANG);
   applyLang();
-  ws.send(JSON.stringify({ t:'mc_lang', lang: LANG }));
+};
+$('mcLang').onchange   = () => {
+  ws.send(JSON.stringify({ t:'mc_lang', lang: $('mcLang').value }));
 };
 
 function take(code){
