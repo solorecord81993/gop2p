@@ -170,8 +170,8 @@ th: {
   'end.reasonForfeit': 'ผู้เล่นหลุดเกินเวลาที่กำหนด',
   'end.reasonRepeat': 'ตำแหน่งซ้ำ (ซันโคะ)',
 
-  'live.waitTitle': 'รอเลือกห้องจากห้องคอนโทรล',
-  'live.waitBody': 'เปิด /director แล้วกด TAKE เพื่อส่งห้องขึ้นภาพนี้',
+  'live.waitTitle': 'รอให้มีการแข่งขัน',
+  'live.waitBody': 'สแกน QR เพื่อสร้างเกมและเล่นกับเพื่อนหรือ AI ได้เลยครับ',
   'live.waitTitleAuto': 'รอให้มีคนเริ่มเล่น',
   'live.waitBodyAuto': 'โหมดอัตโนมัติ — ระบบจะยกห้องที่กำลังเล่นขึ้นภาพให้เอง',
   'live.joinTitle': 'สแกนเพื่อเข้าเล่น',
@@ -421,8 +421,8 @@ en: {
   'end.reasonForfeit': 'opponent disconnected too long',
   'end.reasonRepeat': 'repeated position (triple ko)',
 
-  'live.waitTitle': 'Waiting for the control room',
-  'live.waitBody': 'Open /director and press TAKE to put a room on this screen',
+  'live.waitTitle': 'Waiting for a game',
+  'live.waitBody': 'Scan the QR code to start a game with a friend or AI.',
   'live.waitTitleAuto': 'Waiting for a game to start',
   'live.waitBodyAuto': 'Auto mode — the busiest live room will appear here by itself',
   'live.joinTitle': 'Scan to play',
@@ -672,8 +672,8 @@ ja: {
   'end.reasonForfeit': '接続切れが長すぎたため',
   'end.reasonRepeat': '同形反復（三コウ）',
 
-  'live.waitTitle': 'コントロールルームの選択待ち',
-  'live.waitBody': '/director を開いて TAKE を押すと、この画面に部屋が映ります',
+  'live.waitTitle': '対局を待っています',
+  'live.waitBody': 'QRコードを読み取り、友達やAIとの対局を始めましょう。',
   'live.waitTitleAuto': '対局が始まるのを待っています',
   'live.waitBodyAuto': '自動モード — 盛り上がっている部屋が自動で映ります',
   'live.joinTitle': 'QRコードで対局に参加',

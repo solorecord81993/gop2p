@@ -9,6 +9,7 @@
  * ===================================================================== */
 const fs = require('fs');
 const path = require('path');
+const { T } = require('./i18n.js');
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {
@@ -69,6 +70,8 @@ for (const file of PAGES) {
      html.includes('/ui-light.css') && /name="viewport"/.test(html));
   ok('แสดงโลโก้ Go Live', html.includes('src="/logo.svg"'));
   if (file === 'live.html') {
+    ok('จอรอการแข่งขันไม่กล่าวถึงหน้าผู้กำกับ',
+       !T('live.waitBody', {}, 'th').includes('/director'));
     ok('มีระบบพูดออกเสียงข้อความ MC',
        script.includes('SpeechSynthesisUtterance') && script.includes('Speech.say'));
     ok('ปลดล็อกเสียงพูดตอนกดปุ่มเริ่ม', script.includes('Speech.unlock()'));

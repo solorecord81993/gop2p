@@ -495,6 +495,10 @@ async function testWatchAndFiles(port) {
     const body = await r.text();
     ok(`เสิร์ฟไฟล์ ${path} ได้`, r.status === 200 && body.includes(must));
   }
+  const logo = await fetch(`http://127.0.0.1:${port}/logo.svg`);
+  ok('เสิร์ฟโลโก้ SVG ด้วย MIME type ที่เบราว์เซอร์แสดงเป็นรูปภาพได้',
+     logo.status === 200 && logo.headers.get('content-type') === 'image/svg+xml' &&
+     (await logo.text()).includes('<svg'));
   const hz = await fetch(`http://127.0.0.1:${port}/healthz`).then(r => r.text());
   ok('มี /healthz สำหรับ Render ตรวจสุขภาพ', hz === 'ok');
 
