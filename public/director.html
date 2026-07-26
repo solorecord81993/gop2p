@@ -174,12 +174,18 @@ button:disabled{opacity:.35;cursor:not-allowed}
       <span class="hint" id="saveState" style="margin-left:10px"></span>
     </div>
 
-    <div class="card">
+    <div class="card" style="margin-bottom:14px">
       <h3 style="font-size:1rem;margin-bottom:6px" data-i18n="set.tabAudio"></h3>
       <div class="hint" id="storageNote" style="margin-bottom:8px"></div>
       <div class="hint" style="margin-bottom:4px"><b><span data-i18n="set.fileTypes"></span>:</b> <span id="typeList"></span></div>
       <div class="hint" style="color:#E8A87E;margin-bottom:14px" data-i18n="set.iosWarn"></div>
       <div id="slotList"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:1rem;margin-bottom:6px" data-i18n="set.tabCutscenes"></h3>
+      <div class="hint" style="margin-bottom:14px" data-i18n="set.cutsceneNote"></div>
+      <div id="cutsceneList"></div>
     </div>
   </div>
 </section>
@@ -203,7 +209,7 @@ function applyLang(){
     `<option value="${p}">${I ? I.T('pat.'+p, null, 'th') : p} / ${I ? I.T('pat.'+p, null, 'ja') : ''} · ${TIERS[p]}</option>`).join('');
   if (keep) sel.value = keep;
   $('lnkLive').href = '/live.html?lang=' + LANG;
-  if (SET) renderSlots();
+  if (SET) { renderSlots(); renderCutscenes(); }
   if (!program) $('pgTitle').textContent = T('dir.noRoom');
   if (!preview) $('pvTitle').textContent = T('dir.notPicked');
 }
@@ -317,6 +323,7 @@ async function loadSettings(){
   $('typeList').textContent = SET.audioTypes
     .map(t => `${t.label} (.${t.ext})${t.ios ? '' : ' ✗iOS'}`).join(' · ');
   renderSlots();
+  renderCutscenes();
 }
 
 function renderSlots(){
@@ -378,6 +385,47 @@ function renderSlots(){
       await fetch('/api/audio/' + b.dataset.del, { method:'DELETE', headers: setHeaders() });
       await loadSettings();
     };
+  });
+}
+
+function renderCutscenes(){
+  if (!SET) return;
+  const imageAccept = SET.imageTypes.map(t => '.' + t.ext).join(',') + ',image/*';
+  const audioAccept = SET.audioTypes.map(t => '.' + t.ext).join(',') + ',audio/*';
+  $('cutsceneList').innerHTML = SET.audio.cutscenes.map(scene => {
+    const image = scene.image, audio = scene.audio;
+    return `<div style="border-top:1px solid var(--line);padding:12px 0">
+      <div style="font-family:Mitr;margin-bottom:8px">${T('set.cutsceneSlot', { n:scene.id })}</div>
+      ${image ? `<img src="${image.url}" alt="" style="width:120px;height:68px;object-fit:cover;border-radius:8px;margin-bottom:8px">` : ''}
+      <div class="hint" style="margin-bottom:8px">${T('set.cutsceneImage')}: ${image ? image.name : T('set.none')} · ${T('set.cutsceneAudio')}: ${audio ? audio.name : T('set.none')}</div>
+      <div class="row" style="flex-wrap:wrap;gap:8px">
+        <label class="tag" style="cursor:pointer;border:1px solid var(--line);border-radius:9px;padding:8px 12px">
+          ${T('set.uploadImage')}<input type="file" accept="${imageAccept}" data-cut="${scene.id}" data-kind="image" style="display:none">
+        </label>
+        <label class="tag" style="cursor:pointer;border:1px solid var(--line);border-radius:9px;padding:8px 12px">
+          ${T('set.uploadAudio')}<input type="file" accept="${audioAccept}" data-cut="${scene.id}" data-kind="audio" style="display:none">
+        </label>
+        ${audio ? `<button data-cut-play="${audio.url}" style="padding:8px 12px;font-size:.8rem">${T('set.preview')}</button>` : ''}
+        ${image ? `<button data-cut-del="${scene.id}" data-kind="image" style="padding:8px 12px;font-size:.8rem">${T('set.removeImage')}</button>` : ''}
+        ${audio ? `<button data-cut-del="${scene.id}" data-kind="audio" style="padding:8px 12px;font-size:.8rem">${T('set.removeAudio')}</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  $('cutsceneList').querySelectorAll('input[type=file]').forEach(inp => inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    try {
+      const r = await fetch(`/api/cutscenes/${inp.dataset.cut}/${inp.dataset.kind}`, {
+        method:'PUT', headers:{ ...setHeaders(), 'Content-Type':f.type || 'application/octet-stream',
+          'x-file-name':encodeURIComponent(f.name) }, body:f,
+      }).then(r => r.json());
+      if (r.error) throw new Error(r.error);
+    } catch (e) { alert(T('set.err', { m:e.message })); }
+    await loadSettings();
+  });
+  $('cutsceneList').querySelectorAll('[data-cut-play]').forEach(b => b.onclick = () => new Audio(b.dataset.cutPlay).play().catch(() => {}));
+  $('cutsceneList').querySelectorAll('[data-cut-del]').forEach(b => b.onclick = async () => {
+    await fetch(`/api/cutscenes/${b.dataset.cutDel}/${b.dataset.kind}`, { method:'DELETE', headers:setHeaders() });
+    await loadSettings();
   });
 }
 

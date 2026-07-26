@@ -13,6 +13,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
 const DB_ON = !!(SUPABASE_URL && SUPABASE_KEY);
 const BUCKET = 'audio';
+const CUTSCENE_COUNT = 10;
 
 /* ---------------------------------------------------------------------
  * ชนิดไฟล์เสียงที่รองรับ — ระบุให้ชัดเจนทั้ง MIME และนามสกุล
@@ -28,10 +29,20 @@ const AUDIO_TYPES = [
 ];
 const ACCEPT_EXT   = AUDIO_TYPES.map(t => '.' + t.ext);
 const ACCEPT_MIMES = AUDIO_TYPES.flatMap(t => t.mimes);
+const IMAGE_TYPES = [
+  { ext: 'jpg',  mimes: ['image/jpeg'], label: 'JPG' },
+  { ext: 'png',  mimes: ['image/png'],  label: 'PNG' },
+  { ext: 'webp', mimes: ['image/webp'], label: 'WEBP' },
+];
 
 function typeFromMime(mime) {
   const m = String(mime || '').split(';')[0].trim().toLowerCase();
   return AUDIO_TYPES.find(t => t.mimes.includes(m)) || null;
+}
+
+function imageTypeFromMime(mime) {
+  const m = String(mime || '').split(';')[0].trim().toLowerCase();
+  return IMAGE_TYPES.find(t => t.mimes.includes(m)) || null;
 }
 
 /* ---------------------------------------------------------------------
@@ -59,6 +70,7 @@ const SLOT_IDS = SLOTS.map(s => s.id);
  * ------------------------------------------------------------------- */
 const state = {
   audio: {},          // slot -> { url, ext, size, name, updatedAt }
+  cutscenes: {},      // 1..10 -> { image, audio }
   mc: {},             // groqKey, orKey, groqModel, orModel, lang, minGapMs, idleMs, enabled
   version: 1,
 };
@@ -92,6 +104,7 @@ async function load() {
     for (const r of rows || []) {
       if (r.key === 'audio') state.audio = r.value || {};
       if (r.key === 'mc')    state.mc    = r.value || {};
+      if (r.key === 'cutscenes') state.cutscenes = r.value || {};
     }
     state.version = Date.now();
   } catch (e) {
@@ -188,6 +201,70 @@ async function removeAudio(slot) {
   }
 }
 
+/* ---------------------------------------------------------------------
+ * คัตซีนกำหนดเอง 10 ช่อง — แต่ละช่องมีภาพหนึ่งภาพและเสียงหนึ่งไฟล์
+ * ------------------------------------------------------------------- */
+function cutsceneSlot(index) {
+  const n = Number(index);
+  if (!Number.isInteger(n) || n < 1 || n > CUTSCENE_COUNT) throw new Error('ไม่รู้จักช่องคัตซีนนี้');
+  return n;
+}
+
+async function uploadCutscene(index, kind, buf, mime, filename) {
+  const n = cutsceneSlot(index);
+  if (!['image', 'audio'].includes(kind)) throw new Error('ไม่รู้จักชนิดไฟล์คัตซีน');
+  const type = kind === 'image' ? imageTypeFromMime(mime) : typeFromMime(mime);
+  const allowed = kind === 'image' ? IMAGE_TYPES : AUDIO_TYPES;
+  const maxMB = kind === 'image' ? 5 : 2;
+  if (!type) throw new Error('ชนิดไฟล์ไม่รองรับ — ใช้ได้เฉพาะ ' + allowed.map(t => t.label).join(', '));
+  if (buf.length > maxMB * 1024 * 1024) throw new Error(`ไฟล์ใหญ่เกิน ${maxMB} MB`);
+  if (buf.length < 64) throw new Error('ไฟล์เสียหายหรือว่างเปล่า');
+
+  const key = `cutscene_${String(n).padStart(2, '0')}_${kind}`;
+  const objectName = `${key}.${type.ext}`;
+  let url;
+  if (DB_ON) {
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${objectName}`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': type.mimes[0], 'x-upsert': 'true', 'cache-control': '3600' },
+      body: buf,
+    });
+    if (!res.ok) throw new Error(`อัปโหลดไม่สำเร็จ ${res.status} ${(await res.text()).slice(0, 160)}`);
+    url = `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${objectName}?v=${Date.now()}`;
+  } else {
+    memoryFiles.set(key, { buf, mime: type.mimes[0], ext: type.ext });
+    url = `/api/audio/${key}?v=${Date.now()}`;
+  }
+  state.cutscenes[n] ||= {};
+  state.cutscenes[n][kind] = { url, ext: type.ext, size: buf.length,
+    name: String(filename || '').slice(0, 80) || objectName, updatedAt: new Date().toISOString() };
+  state.version = Date.now();
+  await persist('cutscenes', state.cutscenes);
+  return state.cutscenes[n];
+}
+
+async function removeCutscene(index, kind) {
+  const n = cutsceneSlot(index);
+  if (!['image', 'audio'].includes(kind)) throw new Error('ไม่รู้จักชนิดไฟล์คัตซีน');
+  const key = `cutscene_${String(n).padStart(2, '0')}_${kind}`;
+  memoryFiles.delete(key);
+  if (state.cutscenes[n]) {
+    delete state.cutscenes[n][kind];
+    if (!Object.keys(state.cutscenes[n]).length) delete state.cutscenes[n];
+  }
+  state.version = Date.now();
+  await persist('cutscenes', state.cutscenes);
+  if (DB_ON) {
+    const types = kind === 'image' ? IMAGE_TYPES : AUDIO_TYPES;
+    for (const t of types) {
+      try { await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${key}.${t.ext}`, {
+        method: 'DELETE', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+      }); } catch {}
+    }
+  }
+}
+
 function getMemoryFile(slot) { return memoryFiles.get(slot) || null; }
 
 /** รายการไฟล์เสียงสำหรับให้เบราว์เซอร์โหลดล่วงหน้า */
@@ -203,11 +280,15 @@ function manifest() {
       name: state.audio[s.id]?.name || null,
       size: state.audio[s.id]?.size || 0,
     })),
+    cutscenes: Array.from({ length: CUTSCENE_COUNT }, (_, i) => {
+      const item = state.cutscenes[i + 1] || {};
+      return { id: i + 1, image: item.image || null, audio: item.audio || null };
+    }),
   };
 }
 
 module.exports = {
-  SLOTS, SLOT_IDS, AUDIO_TYPES, ACCEPT_EXT, ACCEPT_MIMES,
-  state, load, saveMC, uploadAudio, removeAudio, getMemoryFile, manifest,
-  DB_ON, typeFromMime,
+  SLOTS, SLOT_IDS, AUDIO_TYPES, IMAGE_TYPES, ACCEPT_EXT, ACCEPT_MIMES, CUTSCENE_COUNT,
+  state, load, saveMC, uploadAudio, removeAudio, uploadCutscene, removeCutscene,
+  getMemoryFile, manifest, DB_ON, typeFromMime, imageTypeFromMime,
 };

@@ -122,6 +122,10 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden}
 @keyframes cutscene{
   0%{opacity:0} 12%{opacity:1} 88%{opacity:1} 100%{opacity:0}
 }
+#customCut{position:absolute;inset:0;z-index:45;background:#000;opacity:0;pointer-events:none;display:grid;place-items:center}
+#customCut.on{animation:customCutscene 5s ease forwards}
+#customCut img{width:100%;height:100%;object-fit:cover}
+@keyframes customCutscene{0%{opacity:0} 8%{opacity:1} 88%{opacity:1} 100%{opacity:0}}
 
 /* ── หน้าจอเริ่มถ่ายทอด (จำเป็นสำหรับ iPhone: ปลดล็อกเสียง + กันจอดับ) ── */
 #boot{position:fixed;inset:0;z-index:90;background:#0F0C0A;color:#F6F2E7;
@@ -199,6 +203,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden}
     </div>
     <div class="brush"></div>
   </div>
+  <div id="customCut"><img id="customCutImage" alt=""></div>
 
   <!-- จอว่างตอนยังไม่มีห้องออกอากาศ -->
   <div class="idle" id="idle">
@@ -435,6 +440,7 @@ function connect(){
     }
     if (m.t === 'state' || m.t === 'end') applyState(m);
     if (m.t === 'highlight') playCutscene(m);      // ค่ายกล — เห็นเฉพาะบนไลฟ์
+    if (m.t === 'custom_cutscene') playCustomCutscene(m);
     if (m.t === 'mc'){
       setMC(m.text);
       if (!program) $('idleMcText').textContent = m.text;
@@ -660,6 +666,21 @@ function playCutscene(m){
   el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
   draw();
   setTimeout(() => { cutBusy = false; cutCoords = null; el.classList.remove('on'); draw(); }, 3000);
+}
+
+let customCutBusy = false;
+function playCustomCutscene(m){
+  if (customCutBusy || !m.imageUrl) return;
+  customCutBusy = true;
+  $('customCutImage').src = m.imageUrl;
+  if (m.audioUrl) {
+    const audio = new Audio(m.audioUrl);
+    audio.volume = .85;
+    audio.play().catch(() => {});
+  }
+  const el = $('customCut');
+  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  setTimeout(() => { customCutBusy = false; el.classList.remove('on'); }, 5000);
 }
 
 /* ── นาฬิกา ── */

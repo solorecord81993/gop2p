@@ -266,6 +266,17 @@ function pushState(room) { broadcast(room, { t: 'state', ...publicState(room) })
  * ===================================================================== */
 const mc = new MCEngine();
 let mcAuto = true;
+let lastCutscene = -1;
+
+function autoCutscene(kind) {
+  if (!['capture', 'byoyomi', 'end'].includes(kind)) return;
+  const ready = SETTINGS.manifest().cutscenes.filter(c => c.image);
+  if (!ready.length) return;
+  lastCutscene = (lastCutscene + 1) % ready.length;
+  const scene = ready[lastCutscene];
+  for (const v of liveViewers) send(v, { t: 'custom_cutscene', id: scene.id,
+    imageUrl: scene.image.url, audioUrl: scene.audio?.url || null });
+}
 
 async function mcSpeak(kind = 'idle', extra = {}, force = false) {
   if (!mcAuto || liveViewers.size === 0) return;
@@ -282,6 +293,7 @@ async function mcSpeak(kind = 'idle', extra = {}, force = false) {
   try {
     const r = await mc.say(ctx, kind);
     for (const v of liveViewers) send(v, { t: 'mc', text: r.text, lang: r.lang, source: r.source, kind });
+    autoCutscene(kind);
   } catch (e) {
     console.warn('[mc]', e.message);
   }
@@ -610,6 +622,7 @@ const server = http.createServer(async (req, res) => {
         audio: SETTINGS.manifest(),
         slots: SETTINGS.SLOTS,
         audioTypes: SETTINGS.AUDIO_TYPES,
+        imageTypes: SETTINGS.IMAGE_TYPES,
         storage: SETTINGS.DB_ON ? 'supabase' : 'memory',
       });
     }
@@ -650,6 +663,23 @@ const server = http.createServer(async (req, res) => {
     } catch (e) {
       return json(res, 400, { error: e.message });
     }
+  }
+
+  /* ---------- ภาพและเสียงคัตซีนกำหนดเอง 10 ช่อง ---------- */
+  const cutMatch = url.pathname.match(/^\/api\/cutscenes\/(\d+)\/(image|audio)$/);
+  if (cutMatch && (req.method === 'PUT' || req.method === 'DELETE')) {
+    if (!isDirector(req)) return json(res, 403, { error: 'no_permission' });
+    try {
+      const [, index, kind] = cutMatch;
+      if (req.method === 'DELETE') await SETTINGS.removeCutscene(index, kind);
+      else {
+        const buf = await readBody(req, 6 * 1024 * 1024);
+        await SETTINGS.uploadCutscene(index, kind, buf, req.headers['content-type'],
+          decodeURIComponent(req.headers['x-file-name'] || ''));
+      }
+      broadcastManifest();
+      return json(res, 200, { ok: true, manifest: SETTINGS.manifest() });
+    } catch (e) { return json(res, 400, { error: e.message }); }
   }
 
   if (url.pathname === '/healthz') { res.writeHead(200); return res.end('ok'); }
