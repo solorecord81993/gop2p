@@ -41,8 +41,9 @@ ZIP นี้เตรียม `server.js` และ `vercel.json` สำหร
 - ถ้าใส่ `KATAGO_API_URL` แล้ว ตัวเลือก `Neural Superhuman` ต้องไม่เป็นสีเทา
 
 ดูสัญญา request/response ของ endpoint และวิธีใช้ local KataGo process ใน
-[`KATAGO-SETUP.md`](KATAGO-SETUP.md) ไม่ควรบรรจุ binary กับ neural net ที่มีขนาดใหญ่
-ลง Vercel Function โดยตรง
+[`KATAGO-SETUP.md`](KATAGO-SETUP.md) `Dockerfile` ที่แถม KataGo มาให้มีไว้สำหรับ
+Render/container host เท่านั้น Vercel จะไม่ build หรือรัน Dockerfile นี้ และไม่ควร
+บรรจุ binary กับ neural net ขนาดใหญ่ลง Vercel Function โดยตรง
 
 ## ข้อจำกัดของ Vercel ที่ควรรู้
 
