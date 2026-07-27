@@ -49,13 +49,18 @@ ok('image กำหนด local KataGo paths ครบและรันแบ�
    /KATAGO_CONFIG=\/app\/katago\/analysis\.cfg/.test(dockerfile) &&
    /\nUSER node\n/.test(dockerfile));
 
-ok('Render ใช้ Docker Starter และค้างผล AI หนึ่งนาที',
+ok('Render ใช้ Docker Free และค้างผล AI หนึ่งนาที',
    /runtime:\s*docker/.test(render) &&
-   /plan:\s*starter/.test(render) &&
+   /plan:\s*free/.test(render) &&
    /dockerfilePath:\s*\.\/Dockerfile/.test(render) &&
-   /key:\s*AI_RESULT_HOLD_MS\s*\n\s*value:\s*"60000"/.test(render));
+   /key:\s*AI_RESULT_HOLD_MS\s*\n\s*value:\s*"60000"/.test(render) &&
+   /key:\s*KATAGO_MAX_VISITS\s*\n\s*value:\s*"32"/.test(render) &&
+   /key:\s*KATAGO_ROOT_SYMMETRIES\s*\n\s*value:\s*"1"/.test(render) &&
+   /key:\s*KATAGO_TIMEOUT_MS\s*\n\s*value:\s*"120000"/.test(render));
 
 ok('CPU config จำกัด thread, batch และ cache สำหรับ container ขนาดเล็ก',
+   /maxVisits\s*=\s*32/.test(config) &&
+   /rootNumSymmetriesToSample\s*=\s*1/.test(config) &&
    /numEigenThreadsPerModel\s*=\s*1/.test(config) &&
    /nnMaxBatchSize\s*=\s*2/.test(config) &&
    /nnCacheSizePowerOfTwo\s*=\s*16/.test(config) &&
@@ -65,18 +70,20 @@ const settings = settingsFromEnv({
   KATAGO_BIN: '/opt/katago/katago',
   KATAGO_MODEL: '/opt/katago/model.txt.gz',
   KATAGO_CONFIG: '/app/katago/analysis.cfg',
-  KATAGO_MAX_VISITS: '96',
-  KATAGO_ROOT_SYMMETRIES: '2',
-  KATAGO_TIMEOUT_MS: '60000',
+  KATAGO_MAX_VISITS: '32',
+  KATAGO_ROOT_SYMMETRIES: '1',
+  KATAGO_TIMEOUT_MS: '120000',
 });
 ok('environment ของ image เปิด neural local mode อัตโนมัติ',
+   /KATAGO_MAX_VISITS=32/.test(dockerfile) &&
+   /KATAGO_ROOT_SYMMETRIES=1/.test(dockerfile) &&
+   /KATAGO_TIMEOUT_MS=120000/.test(dockerfile) &&
    settings.mode === 'local' &&
-   settings.maxVisits === 96 &&
-   settings.rootSymmetries === 2 &&
-   settings.timeoutMs === 60_000);
+   settings.maxVisits === 32 &&
+   settings.rootSymmetries === 1 &&
+   settings.timeoutMs === 120_000);
 
 console.log('\n════════════════════════════════');
 console.log(`  ผ่าน ${pass} · ล้มเหลว ${fail}`);
 console.log('════════════════════════════════');
 process.exit(fail ? 1 : 0);
-
