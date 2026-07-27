@@ -1135,24 +1135,36 @@ async function handle(ws, m) {
   }
 }
 
-async function boot() {
-  await SETTINGS.load();
-  mcSetConfig(SETTINGS.state.mc);
-  if (SETTINGS.state.mc.lang) mc.setLang(SETTINGS.state.mc.lang);
-  const n = Object.keys(SETTINGS.state.audio).length;
-  console.log(`การตั้งค่า: ${SETTINGS.DB_ON ? 'อ่านจาก Supabase' : 'โหมดหน่วยความจำ'} · ไฟล์เสียง ${n} ช่อง`
-            + ` · MC ${mcSummary().groqKeySet ? 'Groq' : mcSummary().orKeySet ? 'OpenRouter' : 'คำพากย์สำรอง'}`);
+let bootPromise = null;
+function boot() {
+  if (!bootPromise) {
+    bootPromise = (async () => {
+      await SETTINGS.load();
+      mcSetConfig(SETTINGS.state.mc);
+      if (SETTINGS.state.mc.lang) mc.setLang(SETTINGS.state.mc.lang);
+      const n = Object.keys(SETTINGS.state.audio).length;
+      console.log(`การตั้งค่า: ${SETTINGS.DB_ON ? 'อ่านจาก Supabase' : 'โหมดหน่วยความจำ'} · ไฟล์เสียง ${n} ช่อง`
+                + ` · MC ${mcSummary().groqKeySet ? 'Groq' : mcSummary().orKeySet ? 'OpenRouter' : 'คำพากย์สำรอง'}`);
+    })();
+  }
+  return bootPromise;
 }
 
+// Vercel imports the HTTP server as a handler instead of necessarily launching
+// this file as the main module, so initialize persisted settings in both modes.
+const ready = boot();
+
 if (require.main === module) {
-  boot();
   server.listen(PORT, () => {
     console.log(`Go Battle Live — พร้อมใช้งานที่พอร์ต ${PORT}`);
     console.log(`ฐานข้อมูล Supabase: ${DB_ON ? 'เชื่อมต่อแล้ว' : 'ยังไม่ได้ตั้งค่า (โหมดทดสอบในเครื่อง)'}`);
   });
 }
 
-module.exports = {
+// Export the http.Server itself for Vercel's WebSocket runtime, while retaining
+// the named properties used by the test suite and other CommonJS consumers.
+Object.assign(server, {
   server, rooms, createRoom, newClock, consume, remainingMs, gorToLabel, boot,
-  AI_LEVELS, closeRoom, endGame,
-};
+  ready, AI_LEVELS, closeRoom, endGame,
+});
+module.exports = server;
