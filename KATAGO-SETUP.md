@@ -12,7 +12,28 @@
 > ความเก่งจริงขึ้นกับไฟล์ neural net, จำนวน visits และ GPU ที่ใช้
 > ควรใช้ network ล่าสุด/แข็งที่สุดจาก [KataGo Training](https://katagotraining.org/)
 
-## วิธี A — เรียก KataGo ผ่าน HTTPS (แนะนำสำหรับ Vercel)
+## วิธีอัตโนมัติ — Render Docker (พร้อมใช้ใน repo นี้)
+
+`Dockerfile` และ `render.yaml` ติดตั้งสิ่งเหล่านี้ให้อัตโนมัติ:
+
+- KataGo v1.16.5 แบบ Eigen CPU จาก release ทางการ
+- network `kata1-b15c192-s449394432-d140458288`
+- config สำหรับ JSON Analysis Engine ที่จำกัดหน่วยความจำ
+- path `KATAGO_BIN`, `KATAGO_MODEL` และ `KATAGO_CONFIG`
+
+ไฟล์ดาวน์โหลดทั้งสองรายการถูกตรึงเวอร์ชันและตรวจ SHA-256 ระหว่าง build
+จึงไม่ต้องดาวน์โหลดเองหรือกรอก path ใด ๆ เมื่อ deploy ด้วย Render Blueprint
+หลัง deploy สำเร็จ ตัวเลือก `Neural Superhuman` จะเปิดเองทั้ง User vs AI และ AI vs AI
+
+ค่าที่ใช้กับ Render Starter คือ 96 visits, 2 root symmetries และ timeout 60 วินาที
+เหมาะสำหรับเปิดใช้งาน KataGo จริงด้วยต้นทุนต่ำ แต่ AI อาจใช้เวลาคิดต่อหนึ่งตาหลายวินาที
+โดยเฉพาะกระดาน 19×19 หากต้องการให้เร็วขึ้นให้เปลี่ยน Render เป็น Standard หรือสูงกว่า
+
+> Docker แบบพร้อมใช้เน้นสมดุลระหว่างความแรง ความเร็ว และ RAM 512 MB จึงไม่ได้บรรจุ
+> network ที่ใหญ่ที่สุด ปัจจุบัน network ที่แข็งที่สุดซึ่งมีคะแนนยืนยันมีขนาดประมาณ
+> 863 MB เฉพาะไฟล์โมเดล และควรรันบน GPU ผ่านวิธี HTTPS ด้านล่าง
+
+## วิธี A — เรียก KataGo ผ่าน HTTPS (Vercel หรือ GPU ระดับสูง)
 
 ตั้ง Environment Variables:
 
@@ -49,10 +70,14 @@ neural net ขนาดใหญ่ไว้ใน deployment ซึ่งมี
 [bundle limit](https://vercel.com/docs/functions/limitations)
 และทรัพยากร CPU/GPU ไม่เหมาะกับ KataGo ระดับสูง
 
+หากกำหนด `KATAGO_API_URL` ใน Docker ด้วย ระบบจะเลือก remote GPU ก่อน KataGo CPU
+ที่ติดตั้งมาใน image โดยอัตโนมัติ
+
 ## วิธี B — รัน KataGo process บนเครื่องเดียวกับเกม
 
-เหมาะกับ Node Web Service แบบ long-running เช่น Render, VPS หรือเครื่องที่มี GPU
-ดาวน์โหลด KataGo binary, analysis config และ neural net ก่อน แล้วตั้งค่า:
+เหมาะกับ Node Web Service แบบ long-running, VPS หรือเครื่อง GPU ที่ไม่ได้ใช้
+Dockerfile ของ repo นี้ ดาวน์โหลด KataGo binary, analysis config และ neural net ก่อน
+แล้วตั้งค่า:
 
 ```env
 KATAGO_BIN=/opt/katago/katago
@@ -80,7 +105,8 @@ local process
 - `KATAGO_TIMEOUT_MS` — เวลารอสูงสุดต่อตา ควรต่ำกว่าเวลาของ AI ในนาฬิกา
 - `KATAGO_RETRY_COOLDOWN_MS` — เวลาพักก่อนลอง endpoint ใหม่หลังเกิดข้อผิดพลาด
 
-ค่าเริ่มต้นคือ 1,600 visits, 8 symmetries และ timeout 20 วินาที
+ค่าเริ่มต้นของ adapter เมื่อกำหนดเองคือ 1,600 visits, 8 symmetries และ timeout
+20 วินาที ส่วน Docker CPU จะกำหนดทับเป็น 96, 2 และ 60 วินาทีตามลำดับ
 ถ้ามี GPU แรงและต้องการเพิ่มความแข็ง ให้เพิ่ม visits พร้อมเพิ่มเวลานาฬิกาให้พอ
 
 ## ตรวจหลังดีพลอย

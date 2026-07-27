@@ -15,6 +15,8 @@
 | `settings.js` | เก็บคีย์ AI และไฟล์เสียงที่อัปโหลดจากหน้าผู้กำกับ |
 | `ai-light.js` | AI heuristic หลายระดับ 30 คิว–โปรโลก ใช้เป็นระดับทั่วไปและตัวสำรอง |
 | `neural-ai.js` | Adapter ของ KataGo neural network ผ่าน HTTPS หรือ local process |
+| `Dockerfile` | ติดตั้ง KataGo CPU + neural net แบบอัตโนมัติสำหรับ Render |
+| `katago/analysis.cfg` | จำกัด thread/cache ของ KataGo ให้เหมาะกับ container ขนาดเล็ก |
 | `KATAGO-SETUP.md` | วิธีเปิดใช้ระดับ Neural Superhuman บน Vercel / Render / GPU server |
 | `server.js` | เซิร์ฟเวอร์กลาง Node + WebSocket — เจ้าของ state และนาฬิกาทั้งหมด |
 | `schema.sql` | โครงฐานข้อมูล Supabase (สมาชิก ดั้ง เกม RLS) |
@@ -26,6 +28,7 @@
 | `test-ui.js` | ตรวจโครงหน้าเว็บ 31 ข้อ |
 | `test-page.js` | **เปิดหน้าเว็บจริงด้วย jsdom** 22 ข้อ — จับสคริปต์พังตอนโหลด |
 | `test-neural.js` | ทดสอบ KataGo adapter, fallback และ neural ทั้ง User vs AI / AI vs AI 10 ข้อ |
+| `test-deploy.js` | ตรวจ Docker, checksum, Render Blueprint และ local KataGo environment 7 ข้อ |
 | `test-server.js` | ทดสอบเซิร์ฟเวอร์ครบวงจร 120 ข้อ |
 
 ---
@@ -70,13 +73,11 @@ npm start       # เปิด http://localhost:3000
 ### 4. ดีพลอยเซิร์ฟเวอร์บน Render
 
 1. push โค้ดขึ้น GitHub
-2. Render → **New → Web Service** → เลือก repo นี้
-3. ตั้งค่า
-   - Runtime: **Node**
-   - Build Command: `npm install --omit=dev`
-   - Start Command: `node server.js`
+2. Render → **New → Blueprint** → เลือก repo นี้
+3. Render จะอ่าน `render.yaml`, build Docker image และติดตั้ง KataGo CPU ให้เอง
    - Health Check Path: `/healthz`
-   - **Instance Type: Starter ($7/เดือน)**
+   - Instance Type: Starter
+   - ไม่ต้องตั้ง `KATAGO_BIN`, `KATAGO_MODEL` หรือ `KATAGO_CONFIG`
 4. ใส่ Environment Variables
 
    | ชื่อ | ค่า |
@@ -86,9 +87,7 @@ npm start       # เปิด http://localhost:3000
    | `DIRECTOR_TOKEN` | รหัสลับที่ตั้งเอง สำหรับเข้าห้องคอนโทรล |
    | `AI_DELAY_MS` | `600` (หน่วงให้ AI ดูเหมือนกำลังคิด) |
    | `AI_RESULT_HOLD_MS` | `60000` (ค้างสรุปผลเกม AI ปะทะ AI 1 นาทีก่อนปิดห้อง) |
-   | `KATAGO_API_URL` | URL ของ KataGo Analysis endpoint (ต้องใส่เพื่อเปิด Neural Superhuman บน Vercel) |
-   | `KATAGO_API_KEY` | คีย์ Bearer ของ KataGo endpoint |
-   | `KATAGO_MAX_VISITS` | `1600` (ยิ่งสูงยิ่งแข็งและใช้ GPU มาก) |
+   | `KATAGO_MAX_VISITS` | `96` สำหรับ CPU ที่ติดตั้งมา (ยิ่งสูงยิ่งแข็งและช้าลง) |
    | `GROQ_API_KEY` | คีย์ Groq (ไม่ต้องใส่ก็ได้ — ใส่จากหน้าตั้งค่าได้เลย) |
    | `OPENROUTER_API_KEY` | คีย์ OpenRouter (ไม่ต้องใส่ก็ได้) |
    | `MC_LANG` | ภาษาที่ MC พูด `th` / `en` / `ja` |
@@ -101,6 +100,8 @@ npm start       # เปิด http://localhost:3000
 > ส่วนฐานข้อมูลให้ใช้ Supabase เท่านั้น เพราะ Postgres ฟรีของ Render จะถูกลบทิ้งหลัง 30 วัน
 
 ไฟล์ `render.yaml` ในโปรเจกต์ตั้งค่าทั้งหมดนี้ไว้แล้ว ใช้ Blueprint ได้เลย
+ดูรายละเอียด network, checksum และวิธีต่อ GPU ที่แรงกว่าใน
+[`KATAGO-SETUP.md`](KATAGO-SETUP.md)
 
 ### 5. เปิดห้องคอนโทรลและตั้งภาพออกอากาศ
 
