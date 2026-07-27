@@ -77,6 +77,11 @@ for (const file of PAGES) {
     ok('ปลดล็อกเสียงพูดตอนกดปุ่มเริ่ม', script.includes('Speech.unlock()'));
     ok('จอว่างมี QR ลิงก์ และคำเชิญของ MC',
        declared.has('joinQr') && declared.has('joinLink') && declared.has('idleMcText'));
+    ok('มีการ์ดสรุปคะแนนจริงหลังเกมจบ',
+       declared.has('resultCard') && declared.has('resultBlack') &&
+       declared.has('resultWhite') && script.includes('showResult'));
+    ok('หน้าไลฟ์ไม่ติดป้ายว่าเป็น AI ข้างชื่อผู้เล่น',
+       !/p\.name\s*\+\s*\(p\.ai/.test(script));
   }
 
   // ---- 5c. หน้าตั้งค่าของผู้กำกับ ----
@@ -89,6 +94,14 @@ for (const file of PAGES) {
     ok('เลือกภาษาหน้าจอและภาษา MC แยกกันได้',
        declared.has('uiLang') && declared.has('mcLang') &&
        script.includes("$('uiLang').onchange") && script.includes("$('mcLang').onchange"));
+    ok('สร้าง AI ปะทะ AI และเลือกระดับได้ทั้งสองฝั่ง',
+       declared.has('aiBlackLevel') && declared.has('aiWhiteLevel') &&
+       declared.has('btnStartAI') && script.includes('director_create_ai_game'));
+    ok('มีปุ่ม X บังคับปิดเกม active',
+       declared.has('btnCloseProgram') && declared.has('btnClosePreview') &&
+       script.includes('director_close_room') && script.includes('tile-close'));
+    ok('หน้าคอนโทรลติด tag AI แยกตามฝั่ง',
+       script.includes('blackAI') && script.includes('whiteAI') && script.includes('ai-badge'));
   }
 
   // ---- 5d. หน้าเว็บต้องโหลดไฟล์เสียงที่อัปโหลดไว้ ----

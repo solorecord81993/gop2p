@@ -79,6 +79,17 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden}
 #board{width:min(960px, 100%);height:auto;aspect-ratio:1/1;border-radius:18px;box-shadow:0 14px 46px rgba(0,0,0,.65)}
 #board.wipe{animation:wipe .8s ease}
 #board.fadein{animation:fadein .45s ease}
+.result-card{position:absolute;z-index:8;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(760px,84%);padding:34px 38px;text-align:center;border-radius:24px;
+  background:rgba(20,16,13,.94);border:3px solid var(--kaya);
+  box-shadow:0 18px 70px rgba(0,0,0,.72),inset 0 0 40px rgba(226,181,101,.08)}
+.result-kicker{font-family:'Mitr';font-size:25px;letter-spacing:.16em;color:var(--kaya)}
+.result-winner{font-family:'Mitr';font-size:54px;line-height:1.2;margin:12px 0 20px}
+.result-scores{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.result-score{padding:13px;border-radius:13px;font-family:'Mitr';font-size:28px}
+.result-score.black{background:#111;color:#fff;border:1px solid #4d443c}
+.result-score.white{background:#f8f4e8;color:#1b1714;border:1px solid #fff}
+.result-hold{font-size:20px;color:var(--muted);margin-top:18px}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
 @keyframes wipe{
   0%{clip-path:inset(0 100% 0 0);filter:brightness(1.6)}
@@ -176,6 +187,15 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden}
 
   <div class="boardbox">
     <canvas id="board" width="960" height="960"></canvas>
+    <div class="result-card hidden" id="resultCard">
+      <div class="result-kicker" data-i18n="live.resultTitle"></div>
+      <div class="result-winner" id="resultWinner"></div>
+      <div class="result-scores" id="resultScores">
+        <div class="result-score black" id="resultBlack"></div>
+        <div class="result-score white" id="resultWhite"></div>
+      </div>
+      <div class="result-hold" data-i18n="live.resultHold"></div>
+    </div>
   </div>
 
   <div class="pcard" id="cardBot">
@@ -436,9 +456,12 @@ function connect(){
       const changed = m.code !== program;
       program = m.code;
       $('idle').classList.toggle('hidden', !!program);
+      if (!program || changed) $('resultCard').classList.add('hidden');
+      if (!program) { view = null; clockBase = null; updateBGM(true); }
       if (changed && program) playTransition(m.transition || TRANSITION);
     }
     if (m.t === 'state' || m.t === 'end') applyState(m);
+    if (m.t === 'room_closed' && m.code === program) $('resultCard').classList.add('hidden');
     if (m.t === 'highlight') playCutscene(m);      // ค่ายกล — เห็นเฉพาะบนไลฟ์
     if (m.t === 'custom_cutscene') playCustomCutscene(m);
     if (m.t === 'mc'){
@@ -526,19 +549,38 @@ function applyState(m){
               : m.result.type === 'white_win' ? T('end.whiteWin')
               : m.result.type === 'draw' ? T('end.draw') : T('end.noResult');
     setMC(`${who} · ${m.result.text}`, true);
+    if (m.mode === 'ai_vs_ai') showResult(m, who);
+    else $('resultCard').classList.add('hidden');
   }
+  if (m.state !== 'finished' || !m.result) $('resultCard').classList.add('hidden');
 }
 
 function paint(pos, p, colorNum, m){
   $(pos+'Stone').className = 'stone ' + (colorNum === 1 ? 'b' : 'w');
-  $(pos+'Name').textContent = p ? p.name + (p.ai ? ' 🤖' : '') : T('game.waitingPlayer');
+  $(pos+'Name').textContent = p ? p.name : T('game.waitingPlayer');
   $(pos+'Rank').textContent = p ? T('live.rankSys', { rank:p.rank }) : '—';
   $(pos+'Cap').textContent  = T('game.prisoners', { n: colorNum === 1 ? m.game.prisoners.black : m.game.prisoners.white });
+}
+
+function showResult(m, who){
+  $('resultWinner').textContent = `${who} · ${m.result.text}`;
+  const score = m.score || m.result.score;
+  $('resultScores').classList.toggle('hidden', !score);
+  if (score){
+    $('resultBlack').textContent = T('live.resultBlack', { n:score.black });
+    $('resultWhite').textContent = T('live.resultWhite', { n:score.white });
+  }
+  $('resultCard').classList.remove('hidden');
 }
 
 /* ── แถบประเมินคะแนน: อิทธิพลอย่างง่าย + เชลย + โคมิ ── */
 function estimate(){
   if (!view) return { b:0.5, black:0, white:0 };
+  const finalScore = view.state === 'finished' && (view.score || view.result?.score);
+  if (finalScore){
+    const total = finalScore.black + finalScore.white || 1;
+    return { b:finalScore.black / total, black:finalScore.black, white:finalScore.white };
+  }
   if (!localGame) {   // ไม่มีเอนจิน ใช้จำนวนเม็ดหมากบนกระดานประมาณคร่าว ๆ แทน
     const bd = view.game.board;
     let nb = 0, nw = 0;
