@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node test.js && node test-i18n.js && node test-ui.js && node test-page.js && node test-server.js"
+    "test": "node test.js && node test-i18n.js && node test-ui.js && node test-page.js && node test-neural.js && node test-server.js"
   },
   "dependencies": {
     "ws": "^8.18.0"

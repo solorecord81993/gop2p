@@ -102,6 +102,9 @@ for (const file of PAGES) {
        script.includes('director_close_room') && script.includes('tile-close'));
     ok('หน้าคอนโทรลติด tag AI แยกตามฝั่ง',
        script.includes('blackAI') && script.includes('whiteAI') && script.includes('ai-badge'));
+    ok('หน้าคอนโทรลแยกสถานะ Neural / Thinking / Fallback ชัดเจน',
+       declared.has('neuralState') && script.includes('aiNeuralTag') &&
+       script.includes('aiThinkingTag') && script.includes('aiFallbackTag'));
   }
 
   // ---- 5d. หน้าเว็บต้องโหลดไฟล์เสียงที่อัปโหลดไว้ ----
@@ -117,10 +120,13 @@ for (const file of PAGES) {
        declared.has('liUser') && declared.has('suUser'));
     ok('แปลงชื่อผู้ใช้เป็นอีเมลภายในให้อัตโนมัติ',
        script.includes('USER_DOMAIN') && script.includes('toEmail'));
-    ok('หน้าผู้เล่นเลือกระดับ AI ได้หลายขั้นถึง World Pro',
+    ok('หน้าผู้เล่นเลือกระดับ AI ได้หลายขั้นถึง Neural Superhuman',
        declared.has('selAI') && script.includes('DEFAULT_AI_LEVELS') &&
        script.includes("id:'firstSteps'") && script.includes("id:'worldPro'") &&
-       script.includes("rank:'9p'"));
+       script.includes("id:'neuralMax'") && script.includes("engine:'neural'"));
+    ok('ระดับ neural ถูกปิดเมื่อ server ยังไม่ได้ตั้งค่า',
+       declared.has('neuralState') && script.includes('level.available === false') &&
+       script.includes('home.neuralUnavailable'));
     ok('ส่งเฉพาะรหัสระดับให้เซิร์ฟเวอร์เป็นผู้กำหนดความเก่ง',
        script.includes("aiLevel:$('selAI').value") &&
        !script.includes('strength:+strength') && !script.includes('gor:+gor'));

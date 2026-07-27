@@ -16,3 +16,13 @@ services:
         sync: false
       - key: AI_DELAY_MS
         value: "600"
+      - key: KATAGO_API_URL
+        sync: false
+      - key: KATAGO_API_KEY
+        sync: false
+      - key: KATAGO_MAX_VISITS
+        value: "1600"
+      - key: KATAGO_ROOT_SYMMETRIES
+        value: "8"
+      - key: KATAGO_TIMEOUT_MS
+        value: "20000"
