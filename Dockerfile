@@ -38,9 +38,9 @@ ENV NODE_ENV=production \
     KATAGO_BIN=/opt/katago/katago \
     KATAGO_MODEL=/opt/katago/model.txt.gz \
     KATAGO_CONFIG=/app/katago/analysis.cfg \
-    KATAGO_MAX_VISITS=96 \
-    KATAGO_ROOT_SYMMETRIES=2 \
-    KATAGO_TIMEOUT_MS=60000 \
+    KATAGO_MAX_VISITS=32 \
+    KATAGO_ROOT_SYMMETRIES=1 \
+    KATAGO_TIMEOUT_MS=120000 \
     KATAGO_RETRY_COOLDOWN_MS=30000
 
 WORKDIR /app
@@ -57,4 +57,3 @@ USER node
 EXPOSE 3000
 
 CMD ["node", "server.js"]
-

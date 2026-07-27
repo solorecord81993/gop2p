@@ -1,9 +1,9 @@
-# ตั้งค่าดีพลอยบน Render — Docker image ติดตั้ง KataGo CPU ให้อัตโนมัติ
+# ตั้งค่าดีพลอยบน Render Free — Docker image ติดตั้ง KataGo CPU ให้อัตโนมัติ
 services:
   - type: web
     name: go-battle-live
     runtime: docker
-    plan: starter          # ห้ามใช้ free — WebSocket จะขาดทุกครั้งที่เครื่องหลับ
+    plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /healthz
     envVars:
@@ -18,10 +18,10 @@ services:
       - key: AI_RESULT_HOLD_MS
         value: "60000"
       - key: KATAGO_MAX_VISITS
-        value: "96"
+        value: "32"
       - key: KATAGO_ROOT_SYMMETRIES
-        value: "2"
+        value: "1"
       - key: KATAGO_TIMEOUT_MS
-        value: "60000"
+        value: "120000"
       - key: KATAGO_RETRY_COOLDOWN_MS
         value: "30000"

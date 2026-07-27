@@ -76,7 +76,7 @@ npm start       # เปิด http://localhost:3000
 2. Render → **New → Blueprint** → เลือก repo นี้
 3. Render จะอ่าน `render.yaml`, build Docker image และติดตั้ง KataGo CPU ให้เอง
    - Health Check Path: `/healthz`
-   - Instance Type: Starter
+   - Instance Type: Free
    - ไม่ต้องตั้ง `KATAGO_BIN`, `KATAGO_MODEL` หรือ `KATAGO_CONFIG`
 4. ใส่ Environment Variables
 
@@ -87,7 +87,9 @@ npm start       # เปิด http://localhost:3000
    | `DIRECTOR_TOKEN` | รหัสลับที่ตั้งเอง สำหรับเข้าห้องคอนโทรล |
    | `AI_DELAY_MS` | `600` (หน่วงให้ AI ดูเหมือนกำลังคิด) |
    | `AI_RESULT_HOLD_MS` | `60000` (ค้างสรุปผลเกม AI ปะทะ AI 1 นาทีก่อนปิดห้อง) |
-   | `KATAGO_MAX_VISITS` | `96` สำหรับ CPU ที่ติดตั้งมา (ยิ่งสูงยิ่งแข็งและช้าลง) |
+   | `KATAGO_MAX_VISITS` | `32` สำหรับ CPU ของแผน Free (ยิ่งสูงยิ่งแข็งและช้าลง) |
+   | `KATAGO_ROOT_SYMMETRIES` | `1` เพื่อลดเวลาคิดบน CPU ของแผน Free |
+   | `KATAGO_TIMEOUT_MS` | `120000` ให้เวลาสูงสุด 2 นาทีสำหรับ neural inference |
    | `GROQ_API_KEY` | คีย์ Groq (ไม่ต้องใส่ก็ได้ — ใส่จากหน้าตั้งค่าได้เลย) |
    | `OPENROUTER_API_KEY` | คีย์ OpenRouter (ไม่ต้องใส่ก็ได้) |
    | `MC_LANG` | ภาษาที่ MC พูด `th` / `en` / `ja` |
@@ -95,9 +97,11 @@ npm start       # เปิด http://localhost:3000
    > คีย์ AI ไม่จำเป็นต้องใส่ตรงนี้ ใส่จาก **หน้าตั้งค่าในห้องคอนโทรล** ได้เลย
    > ค่าที่ใส่จากหน้านั้นจะทับค่าจาก Environment Variables
 
-> **อย่าใช้แผน Free** — เครื่องจะหลับหลังไม่มีคนใช้ 15 นาที ทำให้ WebSocket ของทุกห้องขาดพร้อมกัน
-> และโควตา 750 ชั่วโมง/เดือนเปิดค้างได้แค่บริการเดียว
-> ส่วนฐานข้อมูลให้ใช้ Supabase เท่านั้น เพราะ Postgres ฟรีของ Render จะถูกลบทิ้งหลัง 30 วัน
+> Blueprint นี้ใช้แผน **Free** (RAM 512 MB, CPU 0.1) จึงเหมาะสำหรับทดลองหรือโปรเจกต์งานอดิเรก
+> บริการจะหลับเมื่อไม่มี HTTP request หรือข้อความ WebSocket เข้า 15 นาที และการปลุกกลับมา
+> อาจใช้เวลาประมาณ 1 นาที; ห้องที่เก็บอยู่ใน RAM จะหายเมื่อบริการหยุดหรือรีสตาร์ต
+> หากใช้ถ่ายทอดสดต่อเนื่องหรืออยากให้ KataGo คิดเร็วขึ้น ควรอัปเกรดเป็น Starter ขึ้นไป
+> ดูข้อจำกัดล่าสุดได้ที่ [Render Free](https://render.com/docs/free) และใช้ Supabase เก็บข้อมูลถาวร
 
 ไฟล์ `render.yaml` ในโปรเจกต์ตั้งค่าทั้งหมดนี้ไว้แล้ว ใช้ Blueprint ได้เลย
 ดูรายละเอียด network, checksum และวิธีต่อ GPU ที่แรงกว่าใน
