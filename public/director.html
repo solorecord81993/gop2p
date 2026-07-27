@@ -26,16 +26,23 @@ button{border:none;border-radius:11px;padding:12px 18px;cursor:pointer;color:var
 button:active:not(:disabled){transform:scale(.97)}
 button:disabled{opacity:.35;cursor:not-allowed}
 .btn-take{background:var(--shu);color:#fff;border-color:var(--shu);font-size:1.1rem;padding:16px 34px}
+.control-select{background:var(--sumi-3);border:1px solid var(--line);color:var(--shell);
+  border-radius:10px;padding:11px 12px;font:inherit;width:100%}
 
 .decks{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.deck{border-radius:14px;padding:12px;background:var(--sumi-2);border:2px solid var(--line)}
+.deck{position:relative;border-radius:14px;padding:12px;background:var(--sumi-2);border:2px solid var(--line)}
 .deck.program{border-color:var(--shu)}
 .deck.preview{border-color:var(--matcha)}
 .deck h3{font-size:.78rem;letter-spacing:.14em;margin-bottom:8px}
 .deck.program h3{color:var(--shu)} .deck.preview h3{color:var(--matcha)}
+.deck-close,.tile-close{position:absolute;z-index:3;display:grid;place-items:center;
+  width:34px;height:34px;padding:0;border-radius:50%;font:600 1.35rem/1 'Mitr',sans-serif;
+  color:#fff;background:rgba(194,55,46,.94);border:1px solid #E8877E;
+  box-shadow:0 4px 14px rgba(0,0,0,.35)}
+.deck-close{top:9px;right:9px}.tile-close{top:6px;right:6px;width:30px;height:30px;font-size:1.1rem}
 
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px;margin-top:12px}
-.tile{background:var(--sumi-2);border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer}
+.tile{position:relative;background:var(--sumi-2);border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer}
 .tile.sel{border-color:var(--matcha);box-shadow:0 0 0 1px var(--matcha)}
 .tile.live{border-color:var(--shu);box-shadow:0 0 0 1px var(--shu)}
 .tile canvas{width:100%;height:auto;border-radius:7px;display:block}
@@ -43,9 +50,18 @@ button:disabled{opacity:.35;cursor:not-allowed}
 .heat{height:5px;border-radius:3px;background:var(--sumi-3);overflow:hidden;margin-top:6px}
 .heat > i{display:block;height:100%;background:linear-gradient(90deg,var(--matcha),var(--shu))}
 .badge{background:var(--shu);color:#fff;font-size:.66rem;padding:2px 8px;border-radius:999px;font-family:Mitr}
+.ai-badge{display:inline-flex;align-items:center;background:#6550A5;color:#fff;font-size:.62rem;
+  line-height:1;padding:3px 6px;border-radius:999px;font-family:Mitr;vertical-align:middle}
+.players-line{display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden;white-space:nowrap}
+.players-line .name{overflow:hidden;text-overflow:ellipsis}
+.side-dot{width:9px;height:9px;border-radius:50%;background:#111;border:1px solid #555;flex:none}
+.side-dot.white{background:#fff;border-color:#bbb}
+.ai-controls{display:grid;grid-template-columns:130px 1fr 1fr auto;gap:10px;align-items:end}
+.field-label{display:block;font-size:.74rem;color:var(--muted);margin-bottom:5px}
 .tag{font-size:.72rem;color:var(--muted)}
 .sw{display:flex;align-items:center;gap:8px;font-size:.87rem}
-@media(max-width:640px){.decks{grid-template-columns:1fr}}
+@media(max-width:760px){.ai-controls{grid-template-columns:1fr 1fr}.ai-start{grid-column:1/-1}}
+@media(max-width:640px){.decks{grid-template-columns:1fr}.ai-controls{grid-template-columns:1fr}}
 </style>
 <link rel="stylesheet" href="/ui-light.css">
 </head>
@@ -88,11 +104,13 @@ button:disabled{opacity:.35;cursor:not-allowed}
   <div class="decks">
     <div class="deck program">
       <h3 data-i18n="dir.program"></h3>
+      <button class="deck-close hidden" id="btnCloseProgram" type="button" aria-label="Close game">×</button>
       <canvas id="cvProgram" width="380" height="380"></canvas>
       <div class="meta"><span id="pgTitle"></span><span id="pgInfo"></span></div>
     </div>
     <div class="deck preview">
       <h3 data-i18n="dir.preview"></h3>
+      <button class="deck-close hidden" id="btnClosePreview" type="button" aria-label="Close game">×</button>
       <canvas id="cvPreview" width="380" height="380"></canvas>
       <div class="meta"><span id="pvTitle"></span><span id="pvInfo"></span></div>
     </div>
@@ -103,6 +121,31 @@ button:disabled{opacity:.35;cursor:not-allowed}
     <button id="btnBlack" data-i18n="dir.black"></button>
     <label class="sw"><input type="checkbox" id="autoMode" style="width:auto"> <span data-i18n="dir.auto"></span></label>
     <span class="hint" data-i18n="dir.autoNote"></span>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <h3 style="font-size:1rem;margin-bottom:5px" data-i18n="dir.aiBattleTitle"></h3>
+    <div class="hint" style="margin-bottom:12px" data-i18n="dir.aiBattleNote"></div>
+    <div class="ai-controls">
+      <label>
+        <span class="field-label" data-i18n="dir.aiBoard"></span>
+        <select id="aiBoardSize" class="control-select">
+          <option value="9">9×9</option>
+          <option value="13">13×13</option>
+          <option value="19">19×19</option>
+        </select>
+      </label>
+      <label>
+        <span class="field-label" data-i18n="dir.aiBlack"></span>
+        <select id="aiBlackLevel" class="control-select"></select>
+      </label>
+      <label>
+        <span class="field-label" data-i18n="dir.aiWhite"></span>
+        <select id="aiWhiteLevel" class="control-select"></select>
+      </label>
+      <button class="btn-take ai-start" id="btnStartAI" type="button" data-i18n="dir.aiStart"></button>
+    </div>
+    <div class="hint" id="aiStartState" style="margin-top:9px;color:var(--kaya)"></div>
   </div>
 
   <div class="card" style="margin-bottom:16px">
@@ -198,6 +241,30 @@ let LANG = LANG_ORDER.includes(localStorage.getItem('gb_lang')) ? localStorage.g
 const T = (k,v) => (I ? I.T(k,v,LANG) : k);
 const PATTERNS = ['snapback','double_atari','nakade','ladder','net','ponnuki','ko','seki'];
 const TIERS = { snapback:'SSR', double_atari:'SR', nakade:'SSR', ladder:'SR', net:'SR', ponnuki:'R', ko:'R', seki:'SSR' };
+const DEFAULT_AI_LEVELS = [
+  { id:'starter', rank:'20k' }, { id:'beginner', rank:'15k' },
+  { id:'foundation', rank:'10k' }, { id:'intermediate', rank:'5k' },
+  { id:'advanced', rank:'1k' }, { id:'expert', rank:'1d' },
+  { id:'master', rank:'3d' }, { id:'grandmaster', rank:'5d' },
+];
+let aiLevels = DEFAULT_AI_LEVELS;
+
+function localizedRank(rank){
+  const m = String(rank || '').match(/^(\d+)([kd])$/);
+  if (!m) return rank || '—';
+  return T(m[2] === 'd' ? 'rank.dan' : 'rank.kyu', { n:m[1] });
+}
+
+function renderAILevelOptions(){
+  const blackKeep = $('aiBlackLevel').value || 'intermediate';
+  const whiteKeep = $('aiWhiteLevel').value || 'master';
+  const html = aiLevels.map(level =>
+    `<option value="${level.id}">${T('ai.level.' + level.id)} · ${localizedRank(level.rank)}</option>`).join('');
+  $('aiBlackLevel').innerHTML = html;
+  $('aiWhiteLevel').innerHTML = html;
+  $('aiBlackLevel').value = aiLevels.some(x => x.id === blackKeep) ? blackKeep : aiLevels[0]?.id;
+  $('aiWhiteLevel').value = aiLevels.some(x => x.id === whiteKeep) ? whiteKeep : aiLevels[0]?.id;
+}
 
 function applyLang(){
   document.documentElement.lang = LANG;
@@ -210,6 +277,9 @@ function applyLang(){
   if (keep) sel.value = keep;
   $('lnkLive').href = '/live.html?lang=' + LANG;
   if (SET) { renderSlots(); renderCutscenes(); }
+  renderAILevelOptions();
+  $('btnCloseProgram').title = T('dir.forceClose');
+  $('btnClosePreview').title = T('dir.forceClose');
   if (!program) $('pgTitle').textContent = T('dir.noRoom');
   if (!preview) $('pvTitle').textContent = T('dir.notPicked');
 }
@@ -242,7 +312,9 @@ function connect(){
     const m = JSON.parse(e.data);
     if (m.t === 'director_ok'){
       $('gate').classList.add('hidden'); $('panel').classList.remove('hidden');
-      program = m.program; applyLang(); poll(); setInterval(poll, 2000);
+      program = m.program;
+      if (Array.isArray(m.aiLevels) && m.aiLevels.length) aiLevels = m.aiLevels;
+      applyLang(); poll(); setInterval(poll, 2000);
       ws.send(JSON.stringify({ t:'auto', value:false }));   // เปิดหน้านี้ = คุมเอง
     }
     if (m.t === 'error') $('gateErr').textContent = m.code ? T('srv.' + m.code) : m.msg;
@@ -251,6 +323,20 @@ function connect(){
     if (m.t === 'mc_lang'){ $('mcLang').value = m.lang; }
     if (m.t === 'mc_auto'){ $('mcAuto').checked = !!m.value; }
     if (m.t === 'state' || m.t === 'end'){ states.set(m.code, m); render(); }
+    if (m.t === 'ai_game_created'){
+      $('btnStartAI').disabled = false;
+      $('btnStartAI').textContent = T('dir.aiStart');
+      $('aiStartState').textContent = T('dir.aiCreated', { code:m.code });
+      preview = m.code;
+      states.set(m.code, m);
+      poll();
+    }
+    if (m.t === 'room_closed'){
+      states.delete(m.code);
+      if (preview === m.code) preview = null;
+      if (program === m.code) program = null;
+      poll();
+    }
   };
   ws.onclose = () => setTimeout(connect, 2000);
 }
@@ -292,10 +378,29 @@ function take(code){
 }
 $('btnTake').onclick = () => { if (preview) take(preview); };
 
+function forceClose(code){
+  if (!code || !confirm(T('dir.forceCloseConfirm', { code }))) return;
+  ws.send(JSON.stringify({ t:'director_close_room', code }));
+}
+$('btnCloseProgram').onclick = () => forceClose(program);
+$('btnClosePreview').onclick = () => forceClose(preview);
+
 $('btnBlack').onclick = () => {
   if (!confirm(T('dir.blackConfirm'))) return;
   ws.send(JSON.stringify({ t:'program', code:null }));
   program = null; lastSwitchAt = Date.now(); $('autoMode').checked = false; render();
+};
+
+$('btnStartAI').onclick = () => {
+  $('btnStartAI').disabled = true;
+  $('btnStartAI').textContent = T('dir.aiStarting');
+  $('aiStartState').textContent = '';
+  ws.send(JSON.stringify({
+    t:'director_create_ai_game',
+    size:+$('aiBoardSize').value,
+    blackLevel:$('aiBlackLevel').value,
+    whiteLevel:$('aiWhiteLevel').value,
+  }));
 };
 
 /* ═══════════ หน้าตั้งค่า ═══════════ */
@@ -477,13 +582,14 @@ function render(){
     const el = document.createElement('div');
     el.className = 'tile' + (r.code === preview ? ' sel' : '') + (r.code === program ? ' live' : '');
     el.innerHTML = `
+      <button class="tile-close" type="button" title="${T('dir.forceClose')}" aria-label="${T('dir.forceClose')}">×</button>
       <canvas width="200" height="200"></canvas>
       <div class="meta">
         <span><b>${r.code}</b> ${r.code === program ? '<span class="badge">LIVE</span>' : ''}</span>
         <span>${r.size}×${r.size}</span>
       </div>
       <div class="meta">
-        <span>${r.black || '—'} vs ${r.white || '—'}</span><span>${T('dir.moves', { n:r.moves })}</span>
+        <span class="players-line">${roomPlayersHtml(r)}</span><span>${T('dir.moves', { n:r.moves })}</span>
       </div>
       <div class="heat"><i style="width:${Math.max(3, r.heat)}%"></i></div>`;
     el.onclick = () => {
@@ -492,11 +598,31 @@ function render(){
       syncWatch();
       render();
     };
+    el.querySelector('.tile-close').onclick = e => {
+      e.stopPropagation();
+      forceClose(r.code);
+    };
     g.appendChild(el);
     drawMini(el.querySelector('canvas'), states.get(r.code), r.size);
   }
   paintDeck('cvProgram', 'pg', program);
   paintDeck('cvPreview', 'pv', preview);
+  $('btnCloseProgram').classList.toggle('hidden', !program);
+  $('btnClosePreview').classList.toggle('hidden', !preview);
+}
+
+const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => (
+  { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]
+));
+const aiTag = isAI => isAI ? `<span class="ai-badge">${T('dir.aiTag')}</span>` : '';
+function roomPlayersHtml(r){
+  return `<span class="side-dot"></span><span class="name">${esc(r.black || '—')}</span>${aiTag(r.blackAI)}`
+    + `<span>vs</span><span class="side-dot white"></span><span class="name">${esc(r.white || '—')}</span>${aiTag(r.whiteAI)}`;
+}
+function statePlayersHtml(st){
+  const black = st.players.black, white = st.players.white;
+  return `<span class="side-dot"></span><span class="name">${esc(black?.name || '—')}</span>${aiTag(black?.ai)}`
+    + `<span>vs</span><span class="side-dot white"></span><span class="name">${esc(white?.name || '—')}</span>${aiTag(white?.ai)}`;
 }
 
 function paintDeck(canvasId, prefix, code){
@@ -504,8 +630,8 @@ function paintDeck(canvasId, prefix, code){
   drawMini($(canvasId), st, st ? st.game.size : 9);
   $(prefix + 'Title').textContent = code ? T('live.room', { code })
     : (prefix === 'pg' ? T('dir.noRoom') : T('dir.notPicked'));
-  $(prefix + 'Info').textContent = st
-    ? `${st.players.black ? st.players.black.name : '—'} vs ${st.players.white ? st.players.white.name : '—'} · ${T('dir.moves', { n:st.game.moveCount })}`
+  $(prefix + 'Info').innerHTML = st
+    ? `<span class="players-line">${statePlayersHtml(st)} · ${esc(T('dir.moves', { n:st.game.moveCount }))}</span>`
     : '';
 }
 

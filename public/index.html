@@ -690,6 +690,13 @@ function onMessage(m){
     case 'manifest': applyManifest(m); break;
     case 'state': applyState(m); break;
     case 'end':   applyState(m); showEnd(m); break;
+    case 'room_closed':
+      toast(T('game.roomClosed'));
+      view = null; myColor = null; ghost = null; clockBase = null;
+      history.replaceState(null, '', location.pathname);
+      show('scHome');
+      updateBGM(true);
+      break;
     case 'sfx':   Sound.play(m.id); break;
     case 'emoji': toast((m.from || '') + ' ' + m.id); break;
     case 'error': toast(m.code ? T('srv.' + m.code) : m.msg); Sound.play('illegal'); shake(); break;

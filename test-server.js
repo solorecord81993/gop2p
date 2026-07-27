@@ -6,8 +6,12 @@ process.env.AI_DELAY_MS   = process.env.AI_DELAY_MS   ?? '0';    // ทดสอ
 process.env.AUTO_DWELL_MS = process.env.AUTO_DWELL_MS ?? '600';  // ย่นเวลาค้างห้องตอนทดสอบ
 process.env.MC_MIN_GAP_MS = process.env.MC_MIN_GAP_MS ?? '300';  // ให้ MC พูดถี่ขึ้นตอนทดสอบ
 process.env.MC_IDLE_MS    = process.env.MC_IDLE_MS    ?? '900';
+process.env.AI_RESULT_HOLD_MS = process.env.AI_RESULT_HOLD_MS ?? '120';
 const WebSocket = require('ws');
-const { server, consume, remainingMs, newClock, gorToLabel } = require('./server.js');
+const {
+  server, rooms, createRoom, consume, remainingMs, newClock, gorToLabel,
+  AI_LEVELS, endGame,
+} = require('./server.js');
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra='') => {
@@ -243,6 +247,78 @@ async function testAI(port) {
   }
   ok('เล่นกับ AI ต่อเนื่องหลายตาโดยไม่ล่ม', A.state.game.moveCount >= 6, 'ตาที่ ' + A.state.game.moveCount);
   A.close();
+}
+
+/* =====================================================================
+ * ทดสอบ: ผู้กำกับสร้าง AI ปะทะ AI และบังคับปิดห้อง
+ * ===================================================================== */
+async function testDirectorAIBattle(port) {
+  console.log('\n[4b] ผู้กำกับสร้าง AI ปะทะ AI');
+  const D = new Client(port);
+  await D.ready;
+  D.send({ t:'auth', name:'ผู้กำกับ' }); await D.wait('welcome');
+  D.send({ t:'director_auth', token:'dev-director' });
+  const auth = await D.wait('director_ok');
+  ok('ส่งระดับ AI หลายระดับให้หน้าคอนโทรล',
+     Array.isArray(auth.aiLevels) && auth.aiLevels.length >= 8 &&
+     auth.aiLevels.some(x => x.id === 'starter') && auth.aiLevels.some(x => x.id === 'master'));
+  ok('ระดับ AI ในเซิร์ฟเวอร์ครอบคลุมเริ่มต้นถึงปรมาจารย์',
+     AI_LEVELS[0].rank === '20k' && AI_LEVELS.at(-1).rank === '5d');
+
+  D.send({
+    t:'director_create_ai_game',
+    size:9,
+    blackLevel:'starter',
+    whiteLevel:'grandmaster',
+  });
+  const created = await D.wait('ai_game_created', 4000);
+  ok('เกม AI ปะทะ AI เริ่มเล่นทันที',
+     created.mode === 'ai_vs_ai' && created.state === 'playing');
+  ok('AI ทั้งสองฝั่งมี tag และระดับแยกกันใน state',
+     created.players.black.ai === true && created.players.white.ai === true &&
+     created.players.black.aiLevel === 'starter' &&
+     created.players.white.aiLevel === 'grandmaster');
+  ok('สุ่มชื่อ AI ให้เหมือนชื่อคนและไม่ซ้ำกัน',
+     /[\u0E00-\u0E7F]/.test(created.players.black.name) &&
+     /[\u0E00-\u0E7F]/.test(created.players.white.name) &&
+     created.players.black.name !== created.players.white.name &&
+     !/AI|🤖/i.test(created.players.black.name + created.players.white.name));
+  D.send({ t:'watch', codes:[created.code] });
+  const advanced = await D.waitWhere('state',
+    state => state.code === created.code && state.game.moveCount >= 2, 5000);
+  ok('AI ฝั่งดำและขาวผลัดกันเดินได้เอง', advanced.game.moveCount >= 2);
+
+  const listing = await fetch(`http://127.0.0.1:${port}/api/rooms`).then(r => r.json());
+  const listed = listing.rooms.find(r => r.code === created.code);
+  ok('รายการห้องบอกชัดว่า AI อยู่ฝั่งดำและขาว',
+     listed?.blackAI === true && listed?.whiteAI === true &&
+     listed?.blackAILevel === 'starter' && listed?.whiteAILevel === 'grandmaster');
+
+  D.send({ t:'director_close_room', code:created.code });
+  const closed = await D.wait('room_closed', 3000);
+  ok('ผู้กำกับบังคับปิดเกมที่ active ได้ทันที',
+     closed.code === created.code && closed.reason === 'director');
+  const after = await fetch(`http://127.0.0.1:${port}/api/rooms`).then(r => r.json());
+  ok('ห้องที่บังคับปิดหายจากรายการ active',
+     !after.rooms.some(r => r.code === created.code));
+  D.close();
+}
+
+async function testAIResultHold() {
+  console.log('\n[4c] สรุปผล AI ค้างก่อนปิดอัตโนมัติ');
+  const room = createRoom({ size:9, mode:'ai_vs_ai', timeRule:{ main:0, byoyomi:30, periods:3 } });
+  const score = {
+    black:12, white:10.5, diff:1.5, text:'B+1.5',
+    territory:{ black:10, white:8 }, prisoners:{ black:2, white:1 },
+    komi:1.5, dameCount:0,
+  };
+  const before = Date.now();
+  endGame(room, { type:'black_win', text:'B+1.5', score }, { score });
+  ok('สถานะจบมีคะแนนจริงและกำหนดเวลาปิด',
+     room.state === 'finished' && room.score.black === 12 &&
+     room.autoCloseAt >= before + 100);
+  await sleep(220);
+  ok('ครบเวลาค้างแล้วปิดห้อง AI อัตโนมัติ', !rooms.has(room.code));
 }
 
 /* =====================================================================
@@ -817,6 +893,8 @@ async function testSettings(port) {
     await testFlow(port);
     await testResume(port);
     await testAI(port);
+    await testDirectorAIBattle(port);
+    await testAIResultHold();
     await testReconnect(port);
     await testTimeout(port);
     await testDirector(port);

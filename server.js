@@ -36,9 +36,29 @@ const SUPABASE_KEY    = process.env.SUPABASE_SERVICE_KEY || '';
 const DIRECTOR_TOKEN  = process.env.DIRECTOR_TOKEN || 'dev-director';
 const DB_ON           = !!(SUPABASE_URL && SUPABASE_KEY);
 const AI_DELAY_MS     = Number(process.env.AI_DELAY_MS ?? 600);   // หน่วงให้ AI ดูเหมือนกำลังคิด
+const AI_RESULT_HOLD_MS = Number(process.env.AI_RESULT_HOLD_MS ?? 60_000);
 
 const RECONNECT_GRACE_MS = 60_000;
 const TICK_MS            = 250;
+
+const AI_LEVELS = Object.freeze([
+  { id: 'starter',      strength: 0.06, gor: 100,  rank: '20k' },
+  { id: 'beginner',     strength: 0.20, gor: 600,  rank: '15k' },
+  { id: 'foundation',   strength: 0.38, gor: 1100, rank: '10k' },
+  { id: 'intermediate', strength: 0.56, gor: 1600, rank: '5k'  },
+  { id: 'advanced',     strength: 0.72, gor: 2000, rank: '1k'  },
+  { id: 'expert',       strength: 0.84, gor: 2100, rank: '1d'  },
+  { id: 'master',       strength: 0.94, gor: 2300, rank: '3d'  },
+  { id: 'grandmaster',  strength: 1.00, gor: 2500, rank: '5d'  },
+]);
+const AI_LEVEL_BY_ID = new Map(AI_LEVELS.map(level => [level.id, level]));
+const AI_HUMAN_NAMES = Object.freeze([
+  'นนท์ ธนกฤต', 'มินตรา พิมพ์ใจ', 'ภูริ วรเมธ', 'นารา ชนิกา',
+  'ต้นกล้า ภาคิน', 'เมษา ณิชา', 'ธีร์ กฤติน', 'พิม วริศรา',
+  'เจ เจษฎา', 'แพรว พิชญา', 'คิม กิตติ', 'โมนา ศิริน',
+  'วิน ภูวดล', 'ฟ้า ปาริฉัตร', 'ออม อัญชลี', 'ไนท์ นรินทร์',
+  'มีน มนัสวี', 'ปุณณ์ ปัณณวิชญ์', 'เรย์ รวิศ', 'ขิม ขวัญชนก',
+]);
 
 /* =====================================================================
  * ส่วนที่ 1 — ตัวช่วยคุยกับ Supabase (ใช้ fetch ล้วน ไม่ต้องลง SDK)
@@ -169,6 +189,23 @@ function makeCode() {
   return c;
 }
 
+function randomAIPlayerNames() {
+  const first = Math.floor(Math.random() * AI_HUMAN_NAMES.length);
+  let second = Math.floor(Math.random() * (AI_HUMAN_NAMES.length - 1));
+  if (second >= first) second += 1;
+  return [AI_HUMAN_NAMES[first], AI_HUMAN_NAMES[second]];
+}
+
+function makeAISeat(level, name) {
+  const ai = {
+    id: `control-${level.id}`,
+    levelId: level.id,
+    rank: level.rank,
+    strength: level.strength,
+  };
+  return { userId: null, name, gor: level.gor, ws: null, ai };
+}
+
 function createRoom(opts) {
   const size     = [9, 13, 19].includes(opts.size) ? opts.size : 9;
   const handicap = Math.max(0, Math.min(9, opts.handicap | 0));
@@ -194,6 +231,10 @@ function createRoom(opts) {
     createdAt: Date.now(),
     heat: 0,
     recentCaptures: [],
+    mode: opts.mode === 'ai_vs_ai' ? 'ai_vs_ai' : (opts.vsAI ? 'human_vs_ai' : 'human'),
+    score: null,
+    autoCloseAt: null,
+    closeTimer: null,
   };
   rooms.set(room.code, room);
   return room;
@@ -237,13 +278,20 @@ function broadcast(room, obj) {
 function publicState(room) {
   const el = room.turnStartedAt ? Date.now() - room.turnStartedAt : 0;
   const cur = room.game.turn;
+  const player = seat => seat && {
+    name: seat.name,
+    rank: gorToLabel(seat.gor),
+    ai: !!seat.ai,
+    aiLevel: seat.ai?.levelId || null,
+    online: seat.ai ? true : !!seat.ws,
+  };
   return {
     code: room.code,
     state: room.state,
     game: room.game.snapshot(),
     players: {
-      black: room.seats[BLACK] && { name: room.seats[BLACK].name, rank: gorToLabel(room.seats[BLACK].gor), ai: !!room.seats[BLACK].ai, online: !!room.seats[BLACK].ws },
-      white: room.seats[WHITE] && { name: room.seats[WHITE].name, rank: gorToLabel(room.seats[WHITE].gor), ai: !!room.seats[WHITE].ai, online: !!room.seats[WHITE].ws },
+      black: player(room.seats[BLACK]),
+      white: player(room.seats[WHITE]),
     },
     ready: { black: room.ready[BLACK], white: room.ready[WHITE] },
     clocks: {
@@ -254,6 +302,10 @@ function publicState(room) {
     confirms: { black: room.confirms[BLACK], white: room.confirms[WHITE] },
     timeRule: room.timeRule,
     onAir: programRoom === room.code,
+    mode: room.mode,
+    result: room.game.result || null,
+    score: room.score || room.game.result?.score || null,
+    autoCloseAt: room.autoCloseAt,
   };
 }
 
@@ -346,6 +398,32 @@ function tryStart(room) {
   maybeAIMove(room);
 }
 
+function closeRoom(room, reason = 'closed') {
+  if (!room || !rooms.has(room.code)) return false;
+  if (room.closeTimer) clearTimeout(room.closeTimer);
+  room.state = 'closed';
+  room.turnStartedAt = null;
+  const payload = { t: 'room_closed', code: room.code, reason };
+  for (const c of [BLACK, WHITE]) {
+    const client = room.seats[c]?.ws;
+    if (client) {
+      send(client, payload);
+      if (client.room === room.code) client.room = null;
+    }
+  }
+  for (const spectator of room.spectators) {
+    send(spectator, payload);
+    if (spectator.room === room.code) spectator.room = null;
+  }
+  for (const director of directors) send(director, payload);
+  if (programRoom === room.code) {
+    for (const viewer of liveViewers) send(viewer, payload);
+  }
+  rooms.delete(room.code);
+  if (programRoom === room.code) setProgram(null, 'fade');
+  return true;
+}
+
 function applyElapsed(room) {
   const c = room.game.turn;
   const elapsed = Date.now() - room.turnStartedAt;
@@ -358,11 +436,21 @@ function endGame(room, result, extra = {}) {
   room.state = 'finished';
   room.game.state = 'finished';
   room.game.result = result;
+  room.score = extra.score || result.score || null;
   room.turnStartedAt = null;
+  if (room.mode === 'ai_vs_ai') {
+    room.autoCloseAt = Date.now() + AI_RESULT_HOLD_MS;
+    room.closeTimer = setTimeout(() => {
+      if (rooms.get(room.code) === room && room.state === 'finished') closeRoom(room, 'ai_result_complete');
+    }, AI_RESULT_HOLD_MS);
+    room.closeTimer.unref?.();
+  }
   broadcast(room, { t: 'end', result, ...extra, ...publicState(room) });
   broadcast(room, { t: 'sfx', id: 'game_end' });
   if (programRoom === room.code) mcSpeak('end', { event: 'the game just finished: ' + result.text }, true);
-  saveGame(room, result).catch(e => console.error('[save]', e.message));
+  if (room.mode !== 'ai_vs_ai') {
+    saveGame(room, result).catch(e => console.error('[save]', e.message));
+  }
 }
 
 function timeoutLoss(room) {
@@ -510,6 +598,9 @@ function autoPickRoom() {
   const now = Date.now();
   const cur = programRoom && rooms.get(programRoom);
 
+  // เกม AI ปะทะ AI ต้องค้างสรุปผลบนภาพออกอากาศครบหนึ่งนาที
+  if (cur?.mode === 'ai_vs_ai' && cur.state === 'finished' && now < cur.autoCloseAt) return;
+
   // ห้องปัจจุบันยังเล่นอยู่และยังไม่ครบเวลาค้าง -> ไม่ต้องสลับ
   if (cur && cur.state !== 'finished' && now - lastAutoSwitch < AUTO_DWELL_MS) return;
 
@@ -562,9 +653,8 @@ setInterval(() => {
       }
     }
     // เก็บกวาดห้องร้าง
-    if (everyone(room).length === 0 && now - room.createdAt > 10 * 60_000) {
-      rooms.delete(room.code);
-      if (programRoom === room.code) setProgram(null);
+    if (room.mode !== 'ai_vs_ai' && everyone(room).length === 0 && now - room.createdAt > 10 * 60_000) {
+      closeRoom(room, 'abandoned');
     }
   }
 }, TICK_MS);
@@ -688,6 +778,10 @@ const server = http.createServer(async (req, res) => {
       code: r.code, state: r.state, size: r.game.size,
       moves: r.game.history.length, heat: r.heat,
       black: r.seats[BLACK]?.name ?? null, white: r.seats[WHITE]?.name ?? null,
+      blackAI: !!r.seats[BLACK]?.ai, whiteAI: !!r.seats[WHITE]?.ai,
+      blackAILevel: r.seats[BLACK]?.ai?.levelId ?? null,
+      whiteAILevel: r.seats[WHITE]?.ai?.levelId ?? null,
+      mode: r.mode, autoCloseAt: r.autoCloseAt,
       onAir: programRoom === r.code,
     }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -903,7 +997,43 @@ async function handle(ws, m) {
     case 'director_auth': {
       if (m.token !== DIRECTOR_TOKEN) return sendErr(ws, 'bad_director_token');
       directors.add(ws);
-      send(ws, { t: 'director_ok', program: programRoom });
+      send(ws, {
+        t: 'director_ok',
+        program: programRoom,
+        aiLevels: AI_LEVELS.map(({ id, rank }) => ({ id, rank })),
+      });
+      return;
+    }
+
+    /* ---- ผู้กำกับสร้างเกม AI ปะทะ AI และเริ่มทันที ---- */
+    case 'director_create_ai_game': {
+      if (!directors.has(ws)) return sendErr(ws, 'no_permission');
+      const blackLevel = AI_LEVEL_BY_ID.get(String(m.blackLevel || 'intermediate'))
+        || AI_LEVEL_BY_ID.get('intermediate');
+      const whiteLevel = AI_LEVEL_BY_ID.get(String(m.whiteLevel || 'intermediate'))
+        || AI_LEVEL_BY_ID.get('intermediate');
+      const size = [9, 13, 19].includes(Number(m.size)) ? Number(m.size) : 9;
+      const [blackName, whiteName] = randomAIPlayerNames();
+      const room = createRoom({
+        size,
+        mode: 'ai_vs_ai',
+        timeRule: { main: 0, byoyomi: 30, periods: 3 },
+      });
+      room.seats[BLACK] = makeAISeat(blackLevel, blackName);
+      room.seats[WHITE] = makeAISeat(whiteLevel, whiteName);
+      room.ready[BLACK] = true;
+      room.ready[WHITE] = true;
+      tryStart(room);
+      send(ws, { t: 'ai_game_created', ...publicState(room) });
+      return;
+    }
+
+    /* ---- ผู้กำกับบังคับปิดห้องที่ค้างหรือมีปัญหา ---- */
+    case 'director_close_room': {
+      if (!directors.has(ws)) return sendErr(ws, 'no_permission');
+      const room = rooms.get(String(m.code || '').toUpperCase());
+      if (!room) return sendErr(ws, 'no_room');
+      closeRoom(room, 'director');
       return;
     }
 
@@ -1022,4 +1152,7 @@ if (require.main === module) {
   });
 }
 
-module.exports = { server, rooms, createRoom, newClock, consume, remainingMs, gorToLabel, boot };
+module.exports = {
+  server, rooms, createRoom, newClock, consume, remainingMs, gorToLabel, boot,
+  AI_LEVELS, closeRoom, endGame,
+};
