@@ -40,6 +40,12 @@ ok('ตัวแปรใน {} ตรงกันทุกภาษา', varMis
 
 // ---- 4. ห้ามมีตัวอักษรของภาษาอื่นปน ----
 const AI_NAMES = ['ai.seed15k', 'ai.bamboo10k', 'ai.ping8k'];
+const AI_LEVEL_IDS = [
+  'firstSteps', 'novice', 'starter', 'beginner', 'developing', 'foundation',
+  'club', 'intermediate', 'strongKyu', 'advanced', 'expert', 'master',
+  'grandmaster', 'amateurElite', 'amateurChampion', 'proEntry', 'pro',
+  'elitePro', 'worldPro',
+];
 const strays = [];
 for (const L of LANGS) {
   for (const [k, v] of Object.entries(DICT[L])) {
@@ -70,6 +76,12 @@ ok('คีย์ที่ไม่มีจริงคืนชื่อคี�
 ok('แปลง GoR เป็นระดับได้ทุกภาษา',
    rankLabel(2100, 'th') === '1 ดั้ง' && rankLabel(2100, 'en') === '1 dan' && rankLabel(2100, 'ja') === '1段',
    [rankLabel(2100, 'th'), rankLabel(2100, 'en'), rankLabel(2100, 'ja')].join(' / '));
+ok('ชื่อระดับ AI ครบ 19 ขั้นในทุกภาษา',
+   LANGS.every(L => AI_LEVEL_IDS.every(id => T('ai.level.' + id, null, L) !== 'ai.level.' + id)));
+ok('ป้ายระดับโปรแปลครบทุกภาษา',
+   T('rank.pro', { n:9 }, 'th') === 'โปร 9 ดั้ง' &&
+   T('rank.pro', { n:9 }, 'en') === '9 pro dan' &&
+   T('rank.pro', { n:9 }, 'ja') === 'プロ9段');
 
 /* =====================================================================
  * ตรวจหน้าเว็บว่าไม่มีข้อความตายตัวหลงเหลือ

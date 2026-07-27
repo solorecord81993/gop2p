@@ -242,17 +242,24 @@ const T = (k,v) => (I ? I.T(k,v,LANG) : k);
 const PATTERNS = ['snapback','double_atari','nakade','ladder','net','ponnuki','ko','seki'];
 const TIERS = { snapback:'SSR', double_atari:'SR', nakade:'SSR', ladder:'SR', net:'SR', ponnuki:'R', ko:'R', seki:'SSR' };
 const DEFAULT_AI_LEVELS = [
+  { id:'firstSteps', rank:'30k' }, { id:'novice', rank:'25k' },
   { id:'starter', rank:'20k' }, { id:'beginner', rank:'15k' },
-  { id:'foundation', rank:'10k' }, { id:'intermediate', rank:'5k' },
-  { id:'advanced', rank:'1k' }, { id:'expert', rank:'1d' },
-  { id:'master', rank:'3d' }, { id:'grandmaster', rank:'5d' },
+  { id:'developing', rank:'12k' }, { id:'foundation', rank:'10k' },
+  { id:'club', rank:'8k' }, { id:'intermediate', rank:'5k' },
+  { id:'strongKyu', rank:'3k' }, { id:'advanced', rank:'1k' },
+  { id:'expert', rank:'1d' }, { id:'master', rank:'3d' },
+  { id:'grandmaster', rank:'5d' }, { id:'amateurElite', rank:'7d' },
+  { id:'amateurChampion', rank:'9d' }, { id:'proEntry', rank:'1p' },
+  { id:'pro', rank:'3p' }, { id:'elitePro', rank:'6p' },
+  { id:'worldPro', rank:'9p' },
 ];
 let aiLevels = DEFAULT_AI_LEVELS;
 
 function localizedRank(rank){
-  const m = String(rank || '').match(/^(\d+)([kd])$/);
+  const m = String(rank || '').match(/^(\d+)([kdp])$/);
   if (!m) return rank || '—';
-  return T(m[2] === 'd' ? 'rank.dan' : 'rank.kyu', { n:m[1] });
+  const key = m[2] === 'k' ? 'rank.kyu' : (m[2] === 'd' ? 'rank.dan' : 'rank.pro');
+  return T(key, { n:m[1] });
 }
 
 function renderAILevelOptions(){

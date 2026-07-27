@@ -98,11 +98,20 @@ function visibleText(w) {
 
   const login = w.document.querySelector('[data-i18n="auth.login"]').textContent;
   ok('เริ่มต้นเป็นภาษาไทย', login === 'เข้าสู่ระบบ', login);
+  const aiOptions = [...w.document.getElementById('selAI').options];
+  ok('ตัวเลือกระดับ AI ในหน้าผู้เล่นมีครบ 19 ระดับ',
+     aiOptions.length === 19 && aiOptions[0].value === 'firstSteps' &&
+     aiOptions.at(-1).value === 'worldPro', 'พบ ' + aiOptions.length + ' ระดับ');
+  ok('ระดับสูงสุดแสดงโปรระดับโลก 9 ดั้งในภาษาไทย',
+     aiOptions.at(-1).textContent.includes('โปรระดับโลก') &&
+     aiOptions.at(-1).textContent.includes('โปร 9 ดั้ง'), aiOptions.at(-1).textContent);
 
   // สลับภาษา
   w.document.getElementById('btnLang').click();
   const en = w.document.querySelector('[data-i18n="auth.login"]').textContent;
   ok('กดปุ่มแล้วเปลี่ยนเป็นอังกฤษ', en === 'Log in', en);
+  ok('ตัวเลือก World Pro เปลี่ยนเป็นอังกฤษตามหน้า',
+     [...w.document.getElementById('selAI').options].at(-1).textContent.includes('World Pro'));
   ok('สลับภาษาแล้วไม่มีคำไทยค้าง',
      !visibleText(w).some(t => /[\u0E00-\u0E7F]/.test(t)),
      visibleText(w).filter(t => /[\u0E00-\u0E7F]/.test(t)).slice(0, 3).join(', '));
@@ -111,6 +120,8 @@ function visibleText(w) {
   const ja = w.document.querySelector('[data-i18n="auth.login"]').textContent;
   ok('กดอีกครั้งเปลี่ยนเป็นญี่ปุ่น', ja === 'ログイン', ja);
   ok('ปุ่มภาษาแสดงภาษาปัจจุบัน', w.document.getElementById('btnLang').textContent === 'JA');
+  ok('ตัวเลือกโปรโลกเปลี่ยนเป็นญี่ปุ่นตามหน้า',
+     [...w.document.getElementById('selAI').options].at(-1).textContent.includes('世界トッププロ'));
 
   ok('ช่องกรอกมีข้อความแนะนำ',
      !!w.document.getElementById('liUser').placeholder,
