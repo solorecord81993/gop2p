@@ -16,6 +16,9 @@
  *   SUPABASE_URL               https://xxxx.supabase.co
  *   SUPABASE_SERVICE_KEY       service_role key  ** ห้ามหลุดไปฝั่งเบราว์เซอร์ **
  *   DIRECTOR_TOKEN             รหัสลับสำหรับหน้าเบื้องหลัง
+ *   KATAGO_API_URL             HTTPS endpoint สำหรับ Neural Superhuman (Vercel)
+ *   KATAGO_API_KEY             Bearer key ของ endpoint
+ * หรือ KATAGO_BIN + KATAGO_MODEL + KATAGO_CONFIG สำหรับ process แบบ long-running
  * ถ้าไม่ใส่ค่า Supabase เซิร์ฟเวอร์จะทำงานได้ปกติแต่ไม่บันทึกลงฐานข้อมูล
  * (โหมดนี้ใช้สำหรับรันทดสอบในเครื่อง)
  * ===================================================================== */
@@ -26,6 +29,7 @@ const path = require('path');
 const { WebSocketServer } = require('ws');
 const { GoGame, BLACK, WHITE, KOMI_BY_SIZE } = require('./go-engine.js');
 const AI = require('./ai-light.js');
+const { KataGoClient } = require('./neural-ai.js');
 const { T } = require('./i18n.js');
 const { MCEngine, contextFromRoom, CFG: MC_CFG, setConfig: mcSetConfig, configSummary: mcSummary } = require('./mc.js');
 const SETTINGS = require('./settings.js');
@@ -37,6 +41,7 @@ const DIRECTOR_TOKEN  = process.env.DIRECTOR_TOKEN || 'dev-director';
 const DB_ON           = !!(SUPABASE_URL && SUPABASE_KEY);
 const AI_DELAY_MS     = Number(process.env.AI_DELAY_MS ?? 600);   // หน่วงให้ AI ดูเหมือนกำลังคิด
 const AI_RESULT_HOLD_MS = Number(process.env.AI_RESULT_HOLD_MS ?? 60_000);
+const neuralAI = new KataGoClient();
 
 const RECONNECT_GRACE_MS = 60_000;
 const TICK_MS            = 250;
@@ -61,6 +66,8 @@ const AI_LEVELS = Object.freeze([
   { id: 'pro',             strength: 0.98, gor: 3300, rank: '3p',  reading: 7,  replyWeight: 0.65 },
   { id: 'elitePro',        strength: 0.99, gor: 3600, rank: '6p',  reading: 8,  replyWeight: 0.75 },
   { id: 'worldPro',        strength: 1.00, gor: 3900, rank: '9p',  reading: 10, replyWeight: 0.85 },
+  { id: 'neuralMax',       strength: 1.00, gor: 5000, rank: '∞',   reading: 10, replyWeight: 1.00,
+    engine: 'neural' },
 ]);
 const AI_LEVEL_BY_ID = new Map(AI_LEVELS.map(level => [level.id, level]));
 const LEGACY_AI_LEVEL_IDS = Object.freeze({
@@ -217,6 +224,7 @@ function randomAIPlayerNames() {
 }
 
 function makeAISeat(level, name) {
+  const engine = level.engine || 'heuristic';
   const ai = {
     id: `catalog-${level.id}`,
     levelId: level.id,
@@ -224,8 +232,23 @@ function makeAISeat(level, name) {
     strength: level.strength,
     reading: level.reading,
     replyWeight: level.replyWeight,
+    engine,
+    engineStatus: engine === 'neural' ? 'ready' : 'local',
   };
   return { userId: null, name, gor: level.gor, ws: null, ai };
+}
+
+function aiLevelAvailable(level) {
+  return level.engine !== 'neural' || neuralAI.configured;
+}
+
+function aiCatalog() {
+  return AI_LEVELS.map(({ id, rank, engine = 'heuristic' }) => ({
+    id,
+    rank,
+    engine,
+    available: engine !== 'neural' || neuralAI.configured,
+  }));
 }
 
 function createRoom(opts) {
@@ -257,6 +280,7 @@ function createRoom(opts) {
     score: null,
     autoCloseAt: null,
     closeTimer: null,
+    aiThinking: null,
   };
   rooms.set(room.code, room);
   return room;
@@ -305,6 +329,8 @@ function publicState(room) {
     rank: seatRankLabel(seat),
     ai: !!seat.ai,
     aiLevel: seat.ai?.levelId || null,
+    aiEngine: seat.ai?.engine || null,
+    aiEngineStatus: seat.ai?.engineStatus || null,
     online: seat.ai ? true : !!seat.ws,
   };
   return {
@@ -423,6 +449,7 @@ function tryStart(room) {
 function closeRoom(room, reason = 'closed') {
   if (!room || !rooms.has(room.code)) return false;
   if (room.closeTimer) clearTimeout(room.closeTimer);
+  room.aiThinking = null;
   room.state = 'closed';
   room.turnStartedAt = null;
   const payload = { t: 'room_closed', code: room.code, reason };
@@ -542,15 +569,52 @@ function checkScoreConfirm(room) {
   endGame(room, result, { score: result.score });
 }
 
+async function chooseAIMove(room, color, seat) {
+  if (seat.ai.engine !== 'neural') return AI.chooseMove(room.game, color, seat.ai);
+
+  seat.ai.engineStatus = 'thinking';
+  pushState(room);
+  try {
+    const move = await neuralAI.chooseMove(room.game, color, seat.ai);
+    seat.ai.engineStatus = 'online';
+    seat.ai.lastNeuralError = null;
+    return move;
+  } catch (error) {
+    // เกมต้องไม่ค้างหาก GPU service หลุดระหว่างเล่น แต่หน้าคอนโทรลจะเห็น
+    // สถานะ FALLBACK ชัดเจน จึงไม่แอบอ้างว่าเป็นตาจาก neural network
+    seat.ai.engineStatus = 'fallback';
+    const message = String(error?.message || error);
+    const now = Date.now();
+    if (seat.ai.lastNeuralError !== message || now - (seat.ai.lastNeuralWarningAt || 0) > 30_000) {
+      console.warn(`[neural-ai] ${room.code} ${color === BLACK ? 'B' : 'W'}: ${message}`);
+      seat.ai.lastNeuralError = message;
+      seat.ai.lastNeuralWarningAt = now;
+    }
+    return AI.chooseMove(room.game, color, seat.ai);
+  }
+}
+
 function maybeAIMove(room) {
   if (room.state !== 'playing') return;
   const c = room.game.turn;
   const seat = room.seats[c];
   if (!seat?.ai) return;
+  if (room.aiThinking) return;
+  const token = { color: c, moveCount: room.game.history.length };
+  room.aiThinking = token;
   const delay = AI_DELAY_MS + Math.random() * AI_DELAY_MS * 2;   // ให้ดูเหมือนกำลังคิด
-  setTimeout(() => {
-    if (room.state !== 'playing' || room.game.turn !== c) return;
-    const mv = AI.chooseMove(room.game, c, seat.ai);
+  setTimeout(async () => {
+    if (room.aiThinking !== token || room.state !== 'playing' || room.game.turn !== c) {
+      if (room.aiThinking === token) room.aiThinking = null;
+      return;
+    }
+    const mv = await chooseAIMove(room, c, seat);
+    if (room.aiThinking !== token || room.state !== 'playing' || room.game.turn !== c ||
+        room.game.history.length !== token.moveCount) {
+      if (room.aiThinking === token) room.aiThinking = null;
+      return;
+    }
+    room.aiThinking = null;
     if (mv.pass) doPass(room, c); else doPlay(room, c, mv.x, mv.y);
   }, delay);
 }
@@ -803,6 +867,10 @@ const server = http.createServer(async (req, res) => {
       blackAI: !!r.seats[BLACK]?.ai, whiteAI: !!r.seats[WHITE]?.ai,
       blackAILevel: r.seats[BLACK]?.ai?.levelId ?? null,
       whiteAILevel: r.seats[WHITE]?.ai?.levelId ?? null,
+      blackAIEngine: r.seats[BLACK]?.ai?.engine ?? null,
+      whiteAIEngine: r.seats[WHITE]?.ai?.engine ?? null,
+      blackAIEngineStatus: r.seats[BLACK]?.ai?.engineStatus ?? null,
+      whiteAIEngineStatus: r.seats[WHITE]?.ai?.engineStatus ?? null,
       mode: r.mode, autoCloseAt: r.autoCloseAt,
       onAir: programRoom === r.code,
     }));
@@ -888,7 +956,8 @@ async function handle(ws, m) {
         name: identity.name,
         guest: identity.guest,
         dbOn: DB_ON,
-        aiLevels: AI_LEVELS.map(({ id, rank }) => ({ id, rank })),
+        aiLevels: aiCatalog(),
+        neural: neuralAI.publicStatus(),
       });
       send(ws, { t: 'manifest', ...SETTINGS.manifest() });
       return;
@@ -897,6 +966,13 @@ async function handle(ws, m) {
     /* ---- สร้างห้อง ---- */
     case 'create': {
       if (!ws.identity) return sendErr(ws, 'not_authed');
+      let selectedAILevel = null;
+      if (m.vsAI) {
+        const requested = String(m.aiLevel || m.ai?.levelId || m.ai?.id || '');
+        const levelId = LEGACY_AI_LEVEL_IDS[requested] || requested;
+        selectedAILevel = AI_LEVEL_BY_ID.get(levelId) || AI_LEVEL_BY_ID.get('foundation');
+        if (!aiLevelAvailable(selectedAILevel)) return sendErr(ws, 'neural_unavailable');
+      }
       const room = createRoom(m);
       const color = m.color === 'W' ? WHITE : BLACK;
       let gor = 100;
@@ -905,12 +981,9 @@ async function handle(ws, m) {
       ws.room = room.code;
 
       if (m.vsAI) {
-        const requested = String(m.aiLevel || m.ai?.levelId || m.ai?.id || '');
-        const levelId = LEGACY_AI_LEVEL_IDS[requested] || requested;
-        const level = AI_LEVEL_BY_ID.get(levelId) || AI_LEVEL_BY_ID.get('foundation');
         const [name] = randomAIPlayerNames();
         const other = color === BLACK ? WHITE : BLACK;
-        room.seats[other] = makeAISeat(level, name);
+        room.seats[other] = makeAISeat(selectedAILevel, name);
         room.ready[other] = true;
       }
       send(ws, { t: 'joined', code: room.code, color: color === BLACK ? 'B' : 'W' });
@@ -1032,7 +1105,8 @@ async function handle(ws, m) {
       send(ws, {
         t: 'director_ok',
         program: programRoom,
-        aiLevels: AI_LEVELS.map(({ id, rank }) => ({ id, rank })),
+        aiLevels: aiCatalog(),
+        neural: neuralAI.publicStatus(),
       });
       return;
     }
@@ -1044,6 +1118,9 @@ async function handle(ws, m) {
         || AI_LEVEL_BY_ID.get('intermediate');
       const whiteLevel = AI_LEVEL_BY_ID.get(String(m.whiteLevel || 'intermediate'))
         || AI_LEVEL_BY_ID.get('intermediate');
+      if (!aiLevelAvailable(blackLevel) || !aiLevelAvailable(whiteLevel)) {
+        return sendErr(ws, 'neural_unavailable');
+      }
       const size = [9, 13, 19].includes(Number(m.size)) ? Number(m.size) : 9;
       const [blackName, whiteName] = randomAIPlayerNames();
       const room = createRoom({
@@ -1190,6 +1267,8 @@ if (require.main === module) {
   server.listen(PORT, () => {
     console.log(`Go Battle Live — พร้อมใช้งานที่พอร์ต ${PORT}`);
     console.log(`ฐานข้อมูล Supabase: ${DB_ON ? 'เชื่อมต่อแล้ว' : 'ยังไม่ได้ตั้งค่า (โหมดทดสอบในเครื่อง)'}`);
+    const neural = neuralAI.publicStatus();
+    console.log(`KataGo Neural: ${neural.configured ? `ตั้งค่าแล้ว (${neural.transport})` : 'ยังไม่ได้ตั้งค่า'}`);
   });
 }
 
@@ -1197,6 +1276,6 @@ if (require.main === module) {
 // the named properties used by the test suite and other CommonJS consumers.
 Object.assign(server, {
   server, rooms, createRoom, newClock, consume, remainingMs, gorToLabel, boot,
-  ready, AI_LEVELS, closeRoom, endGame,
+  ready, AI_LEVELS, aiCatalog, neuralAI, closeRoom, endGame,
 });
 module.exports = server;

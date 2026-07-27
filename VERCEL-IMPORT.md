@@ -3,8 +3,7 @@
 ZIP นี้เตรียม `server.js` และ `vercel.json` สำหรับ Vercel Node.js Function
 ไว้แล้ว รวมถึง WebSocket ที่เกมใช้สื่อสารแบบเรียลไทม์
 
-ต้นฉบับมาจาก `solorecord81993/gop2p` สาขา `main` ที่ commit
-`10db16a22dd74b0006b93b7a16a223dc7f16b1f0`
+ต้นฉบับมาจาก `solorecord81993/gop2p` สาขา `main`
 
 ## วิธีนำขึ้น
 
@@ -25,6 +24,11 @@ ZIP นี้เตรียม `server.js` และ `vercel.json` สำหร
 | `SUPABASE_SERVICE_KEY` | แนะนำ | Supabase `service_role` key; ห้ามเผยแพร่ฝั่ง browser |
 | `AI_DELAY_MS` | ไม่ | `600` — เวลาคิดของ AI ต่อหนึ่งตา |
 | `AI_RESULT_HOLD_MS` | ไม่ | `60000` — ค้างสรุปผล AI 1 นาทีก่อนปิดห้อง |
+| `KATAGO_API_URL` | ถ้าจะใช้ Neural | HTTPS endpoint ของ KataGo Analysis Engine |
+| `KATAGO_API_KEY` | แนะนำ | Bearer key ของ KataGo endpoint |
+| `KATAGO_MAX_VISITS` | ไม่ | `1600` — จำนวน visits ของ Neural Superhuman |
+| `KATAGO_ROOT_SYMMETRIES` | ไม่ | `8` — เฉลี่ยสมมาตรที่ root ครบแปดแบบ |
+| `KATAGO_TIMEOUT_MS` | ไม่ | `20000` — timeout ต่อตา |
 | `GROQ_API_KEY` | ไม่ | ใช้กับเสียงพากย์ MC |
 | `OPENROUTER_API_KEY` | ไม่ | ใช้กับเสียงพากย์ MC |
 | `MC_LANG` | ไม่ | `th`, `en` หรือ `ja` |
@@ -34,6 +38,11 @@ ZIP นี้เตรียม `server.js` และ `vercel.json` สำหร
 - `/healthz` ต้องตอบสถานะปกติ
 - `/director` ต้องเข้าได้ด้วยค่า `DIRECTOR_TOKEN`
 - `/live` ต้องเปิดหน้าออกอากาศได้
+- ถ้าใส่ `KATAGO_API_URL` แล้ว ตัวเลือก `Neural Superhuman` ต้องไม่เป็นสีเทา
+
+ดูสัญญา request/response ของ endpoint และวิธีใช้ local KataGo process ใน
+[`KATAGO-SETUP.md`](KATAGO-SETUP.md) ไม่ควรบรรจุ binary กับ neural net ที่มีขนาดใหญ่
+ลง Vercel Function โดยตรง
 
 ## ข้อจำกัดของ Vercel ที่ควรรู้
 

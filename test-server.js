@@ -222,10 +222,18 @@ async function testAI(port) {
   await A.ready;
   A.send({ t: 'auth', name: 'ผู้ท้าชิง' });
   const welcome = await A.wait('welcome');
-  ok('หน้าผู้เล่นได้รับระดับ AI ครบถึงโปรโลก',
-     Array.isArray(welcome.aiLevels) && welcome.aiLevels.length === 19 &&
+  ok('หน้าผู้เล่นได้รับระดับ AI ครบถึง Neural Superhuman',
+     Array.isArray(welcome.aiLevels) && welcome.aiLevels.length === 20 &&
      welcome.aiLevels[0].rank === '30k' &&
-     welcome.aiLevels.at(-1).id === 'worldPro' && welcome.aiLevels.at(-1).rank === '9p');
+     welcome.aiLevels.at(-1).id === 'neuralMax' &&
+     welcome.aiLevels.at(-1).engine === 'neural' &&
+     welcome.aiLevels.at(-1).available === false);
+  const roomsBeforeUnavailable = rooms.size;
+  A.send({ t: 'create', size: 9, vsAI: true, aiLevel: 'neuralMax',
+           timeRule: { main: 300, byoyomi: 30, periods: 3 } });
+  const unavailable = await A.wait('error');
+  ok('ไม่แอบใช้ heuristic เมื่อยังไม่ได้ตั้งค่า neural engine',
+     unavailable.code === 'neural_unavailable' && rooms.size === roomsBeforeUnavailable);
   A.send({ t: 'create', size: 9, timeRule: { main: 300, byoyomi: 30, periods: 3 },
            vsAI: true, aiLevel: 'worldPro',
            ai: { id: 'ปลอม', name: 'ปลอม', strength: 0, gor: -999 } });
@@ -273,11 +281,13 @@ async function testDirectorAIBattle(port) {
   D.send({ t:'director_auth', token:'dev-director' });
   const auth = await D.wait('director_ok');
   ok('ส่งระดับ AI หลายระดับให้หน้าคอนโทรล',
-     Array.isArray(auth.aiLevels) && auth.aiLevels.length === 19 &&
-     auth.aiLevels.some(x => x.id === 'starter') && auth.aiLevels.some(x => x.id === 'worldPro'));
-  ok('ระดับ AI ในเซิร์ฟเวอร์ครอบคลุม 30 คิวถึงโปรโลก 9p',
-     AI_LEVELS[0].rank === '30k' && AI_LEVELS.at(-1).rank === '9p' &&
-     AI_LEVELS.at(-1).reading === 10);
+     Array.isArray(auth.aiLevels) && auth.aiLevels.length === 20 &&
+     auth.aiLevels.some(x => x.id === 'starter') &&
+     auth.aiLevels.some(x => x.id === 'neuralMax' && x.available === false));
+  const worldPro = AI_LEVELS.find(level => level.id === 'worldPro');
+  ok('ระดับ AI ครอบคลุม 30 คิวถึง Neural Superhuman',
+     AI_LEVELS[0].rank === '30k' && worldPro?.rank === '9p' &&
+     worldPro?.reading === 10 && AI_LEVELS.at(-1).engine === 'neural');
 
   D.send({
     t:'director_create_ai_game',

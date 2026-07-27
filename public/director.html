@@ -52,6 +52,8 @@ button:disabled{opacity:.35;cursor:not-allowed}
 .badge{background:var(--shu);color:#fff;font-size:.66rem;padding:2px 8px;border-radius:999px;font-family:Mitr}
 .ai-badge{display:inline-flex;align-items:center;background:#6550A5;color:#fff;font-size:.62rem;
   line-height:1;padding:3px 6px;border-radius:999px;font-family:Mitr;vertical-align:middle}
+.ai-badge.neural{background:#176B63}.ai-badge.thinking{background:#8B6C23}
+.ai-badge.fallback{background:#9A3E36}
 .players-line{display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden;white-space:nowrap}
 .players-line .name{overflow:hidden;text-overflow:ellipsis}
 .side-dot{width:9px;height:9px;border-radius:50%;background:#111;border:1px solid #555;flex:none}
@@ -146,6 +148,7 @@ button:disabled{opacity:.35;cursor:not-allowed}
       <button class="btn-take ai-start" id="btnStartAI" type="button" data-i18n="dir.aiStart"></button>
     </div>
     <div class="hint" id="aiStartState" style="margin-top:9px;color:var(--kaya)"></div>
+    <div class="hint" id="neuralState" style="margin-top:5px"></div>
   </div>
 
   <div class="card" style="margin-bottom:16px">
@@ -252,8 +255,10 @@ const DEFAULT_AI_LEVELS = [
   { id:'amateurChampion', rank:'9d' }, { id:'proEntry', rank:'1p' },
   { id:'pro', rank:'3p' }, { id:'elitePro', rank:'6p' },
   { id:'worldPro', rank:'9p' },
+  { id:'neuralMax', rank:'∞', engine:'neural', available:false },
 ];
 let aiLevels = DEFAULT_AI_LEVELS;
+let neuralStatus = { configured:false, transport:'disabled', state:'disabled' };
 
 function localizedRank(rank){
   const m = String(rank || '').match(/^(\d+)([kdp])$/);
@@ -265,12 +270,23 @@ function localizedRank(rank){
 function renderAILevelOptions(){
   const blackKeep = $('aiBlackLevel').value || 'intermediate';
   const whiteKeep = $('aiWhiteLevel').value || 'master';
-  const html = aiLevels.map(level =>
-    `<option value="${level.id}">${T('ai.level.' + level.id)} · ${localizedRank(level.rank)}</option>`).join('');
-  $('aiBlackLevel').innerHTML = html;
-  $('aiWhiteLevel').innerHTML = html;
-  $('aiBlackLevel').value = aiLevels.some(x => x.id === blackKeep) ? blackKeep : aiLevels[0]?.id;
-  $('aiWhiteLevel').value = aiLevels.some(x => x.id === whiteKeep) ? whiteKeep : aiLevels[0]?.id;
+  for (const [select, keep] of [[$('aiBlackLevel'), blackKeep], [$('aiWhiteLevel'), whiteKeep]]) {
+    const options = aiLevels.map(level => {
+      const option = document.createElement('option');
+      const neural = level.engine === 'neural';
+      option.value = level.id;
+      option.disabled = neural && level.available === false;
+      option.textContent = `${neural ? '🧠 ' : ''}${T('ai.level.' + level.id)} · ${localizedRank(level.rank)}`
+        + (option.disabled ? ` · ${T('ai.needsSetup')}` : '');
+      return option;
+    });
+    select.replaceChildren(...options);
+    const kept = aiLevels.find(level => level.id === keep && level.available !== false);
+    select.value = kept ? keep : (aiLevels.find(level => level.id === 'intermediate')?.id || aiLevels[0]?.id || '');
+  }
+  $('neuralState').textContent = neuralStatus.configured
+    ? T('dir.neuralReady', { transport:neuralStatus.transport })
+    : T('dir.neuralUnavailable');
 }
 
 function applyLang(){
@@ -321,10 +337,19 @@ function connect(){
       $('gate').classList.add('hidden'); $('panel').classList.remove('hidden');
       program = m.program;
       if (Array.isArray(m.aiLevels) && m.aiLevels.length) aiLevels = m.aiLevels;
+      if (m.neural) neuralStatus = m.neural;
       applyLang(); poll(); setInterval(poll, 2000);
       ws.send(JSON.stringify({ t:'auto', value:false }));   // เปิดหน้านี้ = คุมเอง
     }
-    if (m.t === 'error') $('gateErr').textContent = m.code ? T('srv.' + m.code) : m.msg;
+    if (m.t === 'error'){
+      const message = m.code ? T('srv.' + m.code) : m.msg;
+      $('gateErr').textContent = message;
+      if (!$('panel').classList.contains('hidden')) {
+        $('btnStartAI').disabled = false;
+        $('btnStartAI').textContent = T('dir.aiStart');
+        $('aiStartState').textContent = message;
+      }
+    }
     if (m.t === 'program'){ program = m.code; lastSwitchAt = Date.now(); render(); }
     if (m.t === 'auto'){ $('autoMode').checked = !!m.value; }
     if (m.t === 'mc_lang'){ $('mcLang').value = m.lang; }
@@ -621,15 +646,25 @@ function render(){
 const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => (
   { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]
 ));
-const aiTag = isAI => isAI ? `<span class="ai-badge">${T('dir.aiTag')}</span>` : '';
+function aiTag(isAI, engine, status){
+  if (!isAI) return '';
+  if (engine !== 'neural') return `<span class="ai-badge">${T('dir.aiTag')}</span>`;
+  if (status === 'fallback') return `<span class="ai-badge fallback">${T('dir.aiFallbackTag')}</span>`;
+  if (status === 'thinking') return `<span class="ai-badge thinking">${T('dir.aiThinkingTag')}</span>`;
+  return `<span class="ai-badge neural">${T('dir.aiNeuralTag')}</span>`;
+}
 function roomPlayersHtml(r){
-  return `<span class="side-dot"></span><span class="name">${esc(r.black || '—')}</span>${aiTag(r.blackAI)}`
-    + `<span>vs</span><span class="side-dot white"></span><span class="name">${esc(r.white || '—')}</span>${aiTag(r.whiteAI)}`;
+  return `<span class="side-dot"></span><span class="name">${esc(r.black || '—')}</span>`
+    + aiTag(r.blackAI, r.blackAIEngine, r.blackAIEngineStatus)
+    + `<span>vs</span><span class="side-dot white"></span><span class="name">${esc(r.white || '—')}</span>`
+    + aiTag(r.whiteAI, r.whiteAIEngine, r.whiteAIEngineStatus);
 }
 function statePlayersHtml(st){
   const black = st.players.black, white = st.players.white;
-  return `<span class="side-dot"></span><span class="name">${esc(black?.name || '—')}</span>${aiTag(black?.ai)}`
-    + `<span>vs</span><span class="side-dot white"></span><span class="name">${esc(white?.name || '—')}</span>${aiTag(white?.ai)}`;
+  return `<span class="side-dot"></span><span class="name">${esc(black?.name || '—')}</span>`
+    + aiTag(black?.ai, black?.aiEngine, black?.aiEngineStatus)
+    + `<span>vs</span><span class="side-dot white"></span><span class="name">${esc(white?.name || '—')}</span>`
+    + aiTag(white?.ai, white?.aiEngine, white?.aiEngineStatus);
 }
 
 function paintDeck(canvasId, prefix, code){
