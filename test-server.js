@@ -220,12 +220,25 @@ async function testAI(port) {
   console.log('\n[4] เล่นกับคอมพิวเตอร์');
   const A = new Client(port);
   await A.ready;
-  A.send({ t: 'auth', name: 'ผู้ท้าชิง' }); await A.wait('welcome');
+  A.send({ t: 'auth', name: 'ผู้ท้าชิง' });
+  const welcome = await A.wait('welcome');
+  ok('หน้าผู้เล่นได้รับระดับ AI ครบถึงโปรโลก',
+     Array.isArray(welcome.aiLevels) && welcome.aiLevels.length === 19 &&
+     welcome.aiLevels[0].rank === '30k' &&
+     welcome.aiLevels.at(-1).id === 'worldPro' && welcome.aiLevels.at(-1).rank === '9p');
   A.send({ t: 'create', size: 9, timeRule: { main: 300, byoyomi: 30, periods: 3 },
-           vsAI: true, ai: { id: 'seed15k', name: 'น้องเมล็ด', strength: 0.3, gor: 600 } });
-  await A.wait('joined');
+           vsAI: true, aiLevel: 'worldPro',
+           ai: { id: 'ปลอม', name: 'ปลอม', strength: 0, gor: -999 } });
+  const joined = await A.wait('joined');
   const s0 = await A.waitState(s => !!s.players.white);
   ok('AI นั่งที่นั่งขาวและพร้อมอัตโนมัติ', s0.players.white.ai === true && s0.ready.white === true);
+  ok('ผู้เล่นเลือก World Pro แล้วได้ระดับ 9p จริงใน state',
+     s0.players.white.aiLevel === 'worldPro' && s0.players.white.rank === '9p');
+  const selectedAI = rooms.get(joined.code)?.seats[2];
+  ok('เซิร์ฟเวอร์ยึดโปรไฟล์ World Pro จาก catalog และไม่เชื่อค่าปลอมจาก client',
+     selectedAI?.ai?.strength === 1 && selectedAI?.ai?.reading === 10 &&
+     selectedAI?.ai?.replyWeight === 0.85 && selectedAI?.gor === 3900 &&
+     selectedAI?.name !== 'ปลอม');
 
   A.send({ t: 'ready' });
   await A.waitState(s => s.state === 'playing');
@@ -260,16 +273,17 @@ async function testDirectorAIBattle(port) {
   D.send({ t:'director_auth', token:'dev-director' });
   const auth = await D.wait('director_ok');
   ok('ส่งระดับ AI หลายระดับให้หน้าคอนโทรล',
-     Array.isArray(auth.aiLevels) && auth.aiLevels.length >= 8 &&
-     auth.aiLevels.some(x => x.id === 'starter') && auth.aiLevels.some(x => x.id === 'master'));
-  ok('ระดับ AI ในเซิร์ฟเวอร์ครอบคลุมเริ่มต้นถึงปรมาจารย์',
-     AI_LEVELS[0].rank === '20k' && AI_LEVELS.at(-1).rank === '5d');
+     Array.isArray(auth.aiLevels) && auth.aiLevels.length === 19 &&
+     auth.aiLevels.some(x => x.id === 'starter') && auth.aiLevels.some(x => x.id === 'worldPro'));
+  ok('ระดับ AI ในเซิร์ฟเวอร์ครอบคลุม 30 คิวถึงโปรโลก 9p',
+     AI_LEVELS[0].rank === '30k' && AI_LEVELS.at(-1).rank === '9p' &&
+     AI_LEVELS.at(-1).reading === 10);
 
   D.send({
     t:'director_create_ai_game',
     size:9,
     blackLevel:'starter',
-    whiteLevel:'grandmaster',
+    whiteLevel:'worldPro',
   });
   const created = await D.wait('ai_game_created', 4000);
   ok('เกม AI ปะทะ AI เริ่มเล่นทันที',
@@ -277,7 +291,8 @@ async function testDirectorAIBattle(port) {
   ok('AI ทั้งสองฝั่งมี tag และระดับแยกกันใน state',
      created.players.black.ai === true && created.players.white.ai === true &&
      created.players.black.aiLevel === 'starter' &&
-     created.players.white.aiLevel === 'grandmaster');
+     created.players.white.aiLevel === 'worldPro' &&
+     created.players.white.rank === '9p');
   ok('สุ่มชื่อ AI ให้เหมือนชื่อคนและไม่ซ้ำกัน',
      /[\u0E00-\u0E7F]/.test(created.players.black.name) &&
      /[\u0E00-\u0E7F]/.test(created.players.white.name) &&
@@ -292,7 +307,7 @@ async function testDirectorAIBattle(port) {
   const listed = listing.rooms.find(r => r.code === created.code);
   ok('รายการห้องบอกชัดว่า AI อยู่ฝั่งดำและขาว',
      listed?.blackAI === true && listed?.whiteAI === true &&
-     listed?.blackAILevel === 'starter' && listed?.whiteAILevel === 'grandmaster');
+     listed?.blackAILevel === 'starter' && listed?.whiteAILevel === 'worldPro');
 
   D.send({ t:'director_close_room', code:created.code });
   const closed = await D.wait('room_closed', 3000);

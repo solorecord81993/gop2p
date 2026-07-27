@@ -207,14 +207,12 @@ canvas{width:100%; height:auto; display:block; border-radius:12px; touch-action:
     <div style="height:15px"></div>
     <button class="btn-main btn-wide" id="btnCreate" data-i18n="home.create"></button>
     <div style="height:9px"></div>
+    <label data-i18n="home.aiLevel"></label>
     <div class="row">
-      <select id="selAI" class="grow">
-        <option value="seed15k|0.10|600" data-i18n="ai.seed15k"></option>
-        <option value="bamboo10k|0.32|1100" data-i18n="ai.bamboo10k"></option>
-        <option value="ping8k|0.60|1300" data-i18n="ai.ping8k"></option>
-      </select>
+      <select id="selAI" class="grow"></select>
       <button class="btn-ghost" id="btnAI" style="white-space:nowrap" data-i18n="home.aiBtn"></button>
     </div>
+    <div class="hint" style="margin-top:7px" data-i18n="home.aiNote"></div>
   </div>
 
   <div class="card">
@@ -319,6 +317,39 @@ function guessLang(){
 let LANG = guessLang();
 const T = (k, v) => (I ? I.T(k, v, LANG) : k);
 const gorLabel = g => (I ? I.rankLabel(g, LANG) : '—');
+const DEFAULT_AI_LEVELS = [
+  { id:'firstSteps', rank:'30k' }, { id:'novice', rank:'25k' },
+  { id:'starter', rank:'20k' }, { id:'beginner', rank:'15k' },
+  { id:'developing', rank:'12k' }, { id:'foundation', rank:'10k' },
+  { id:'club', rank:'8k' }, { id:'intermediate', rank:'5k' },
+  { id:'strongKyu', rank:'3k' }, { id:'advanced', rank:'1k' },
+  { id:'expert', rank:'1d' }, { id:'master', rank:'3d' },
+  { id:'grandmaster', rank:'5d' }, { id:'amateurElite', rank:'7d' },
+  { id:'amateurChampion', rank:'9d' }, { id:'proEntry', rank:'1p' },
+  { id:'pro', rank:'3p' }, { id:'elitePro', rank:'6p' },
+  { id:'worldPro', rank:'9p' },
+];
+let aiLevels = DEFAULT_AI_LEVELS;
+
+function localizedRank(rank){
+  const m = String(rank || '').match(/^(\d+)([kdp])$/);
+  if (!m) return rank || '—';
+  const key = m[2] === 'k' ? 'rank.kyu' : (m[2] === 'd' ? 'rank.dan' : 'rank.pro');
+  return T(key, { n:m[1] });
+}
+
+function renderAILevelOptions(){
+  const select = $('selAI');
+  const keep = select.value || 'foundation';
+  const options = aiLevels.map(level => {
+    const option = document.createElement('option');
+    option.value = level.id;
+    option.textContent = `${T('ai.level.' + level.id)} · ${localizedRank(level.rank)}`;
+    return option;
+  });
+  select.replaceChildren(...options);
+  select.value = aiLevels.some(level => level.id === keep) ? keep : (aiLevels[0]?.id || '');
+}
 
 /* ── แถบแจ้งข้อผิดพลาดบนหน้าจอ ──
  * เดิมถ้าสคริปต์ภายนอกโหลดไม่สำเร็จ ทั้งหน้าจะตายเงียบ ๆ กดปุ่มอะไรก็ไม่มีอะไรเกิดขึ้น
@@ -455,6 +486,7 @@ function applyLang(){
   $('copyLbl').textContent = T('game.codeBtn');
   const size = document.querySelector('#sizeChips .chip.on');
   if (size) $('sizeHint').textContent = T('home.sizeHint' + size.dataset.size);
+  renderAILevelOptions();
   paintNet();
   if (view) applyState(view);
   else if (myGor != null) paintMyRank();
@@ -675,6 +707,10 @@ function onMessage(m){
     case 'welcome':
       playerToken = m.playerToken; localStorage.setItem('gb_token', playerToken);
       if (!$('meName').textContent || $('meName').textContent === '—') $('meName').textContent = m.name;
+      if (Array.isArray(m.aiLevels) && m.aiLevels.length) {
+        aiLevels = m.aiLevels;
+        renderAILevelOptions();
+      }
       if (m.guest) { isGuest = true; paintMyRank(); }
       if (!m.dbOn) console.info('เซิร์ฟเวอร์ยังไม่ได้เชื่อม Supabase — เล่นได้แต่ไม่บันทึกผล');
       if (pendingRoom){ sendWs({ t:'join', code: pendingRoom }); pendingRoom = null; }
@@ -715,10 +751,8 @@ const chosenTime = () => { const [m,b,p] = $('selTime').value.split(',').map(Num
 
 $('btnCreate').onclick = () => sendWs({ t:'create', size:chosenSize(), timeRule:chosenTime() });
 $('btnAI').onclick = () => {
-  const [id, strength, gor] = $('selAI').value.split('|');
-  const name = T('ai.' + id).split('·')[0].trim();
   sendWs({ t:'create', size:chosenSize(), timeRule:chosenTime(), vsAI:true,
-           ai:{ id, name, strength:+strength, gor:+gor } });
+           aiLevel:$('selAI').value });
 };
 $('btnJoin').onclick = () => {
   const code = $('inCode').value.trim().toUpperCase();
@@ -782,7 +816,7 @@ function paintCard(pos, p, colorNum, m){
   $(pos+'Name').textContent = p
     ? p.name + (p.ai ? ' 🤖' : '') + (!p.ai && p.online === false ? ' ' + T('game.offline') : '')
     : T('game.waitingPlayer');
-  $(pos+'Sub').textContent = p ? p.rank : '—';
+  $(pos+'Sub').textContent = p ? localizedRank(p.rank) : '—';
   $(pos+'Cap').textContent = T('game.prisoners', { n: colorNum === 1 ? m.game.prisoners.black : m.game.prisoners.white });
 }
 

@@ -42,16 +42,32 @@ const RECONNECT_GRACE_MS = 60_000;
 const TICK_MS            = 250;
 
 const AI_LEVELS = Object.freeze([
-  { id: 'starter',      strength: 0.06, gor: 100,  rank: '20k' },
-  { id: 'beginner',     strength: 0.20, gor: 600,  rank: '15k' },
-  { id: 'foundation',   strength: 0.38, gor: 1100, rank: '10k' },
-  { id: 'intermediate', strength: 0.56, gor: 1600, rank: '5k'  },
-  { id: 'advanced',     strength: 0.72, gor: 2000, rank: '1k'  },
-  { id: 'expert',       strength: 0.84, gor: 2100, rank: '1d'  },
-  { id: 'master',       strength: 0.94, gor: 2300, rank: '3d'  },
-  { id: 'grandmaster',  strength: 1.00, gor: 2500, rank: '5d'  },
+  { id: 'firstSteps',      strength: 0.02, gor: -900, rank: '30k', reading: 0,  replyWeight: 0    },
+  { id: 'novice',          strength: 0.06, gor: -400, rank: '25k', reading: 0,  replyWeight: 0    },
+  { id: 'starter',         strength: 0.12, gor: 100,  rank: '20k', reading: 0,  replyWeight: 0    },
+  { id: 'beginner',        strength: 0.20, gor: 600,  rank: '15k', reading: 0,  replyWeight: 0    },
+  { id: 'developing',      strength: 0.30, gor: 900,  rank: '12k', reading: 0,  replyWeight: 0    },
+  { id: 'foundation',      strength: 0.38, gor: 1100, rank: '10k', reading: 0,  replyWeight: 0    },
+  { id: 'club',            strength: 0.47, gor: 1300, rank: '8k',  reading: 0,  replyWeight: 0    },
+  { id: 'intermediate',    strength: 0.56, gor: 1600, rank: '5k',  reading: 0,  replyWeight: 0    },
+  { id: 'strongKyu',       strength: 0.65, gor: 1800, rank: '3k',  reading: 0,  replyWeight: 0    },
+  { id: 'advanced',        strength: 0.72, gor: 2000, rank: '1k',  reading: 0,  replyWeight: 0    },
+  { id: 'expert',          strength: 0.80, gor: 2100, rank: '1d',  reading: 1,  replyWeight: 0.10 },
+  { id: 'master',          strength: 0.86, gor: 2300, rank: '3d',  reading: 2,  replyWeight: 0.15 },
+  { id: 'grandmaster',     strength: 0.90, gor: 2500, rank: '5d',  reading: 3,  replyWeight: 0.25 },
+  { id: 'amateurElite',    strength: 0.93, gor: 2700, rank: '7d',  reading: 4,  replyWeight: 0.35 },
+  { id: 'amateurChampion', strength: 0.95, gor: 2900, rank: '9d',  reading: 5,  replyWeight: 0.45 },
+  { id: 'proEntry',        strength: 0.97, gor: 3100, rank: '1p',  reading: 6,  replyWeight: 0.55 },
+  { id: 'pro',             strength: 0.98, gor: 3300, rank: '3p',  reading: 7,  replyWeight: 0.65 },
+  { id: 'elitePro',        strength: 0.99, gor: 3600, rank: '6p',  reading: 8,  replyWeight: 0.75 },
+  { id: 'worldPro',        strength: 1.00, gor: 3900, rank: '9p',  reading: 10, replyWeight: 0.85 },
 ]);
 const AI_LEVEL_BY_ID = new Map(AI_LEVELS.map(level => [level.id, level]));
+const LEGACY_AI_LEVEL_IDS = Object.freeze({
+  seed15k: 'beginner',
+  bamboo10k: 'foundation',
+  ping8k: 'club',
+});
 const AI_HUMAN_NAMES = Object.freeze([
   'นนท์ ธนกฤต', 'มินตรา พิมพ์ใจ', 'ภูริ วรเมธ', 'นารา ชนิกา',
   'ต้นกล้า ภาคิน', 'เมษา ณิชา', 'ธีร์ กฤติน', 'พิม วริศรา',
@@ -114,6 +130,10 @@ function gorToLabel(gor) {
   if (gor == null) return '—';
   if (gor >= 2100) return `${Math.min(9, Math.floor((gor - 2000) / 100))} ดั้ง`;
   return `${Math.min(30, Math.max(1, Math.ceil((2100 - gor) / 100)))} คิว`;
+}
+
+function seatRankLabel(seat) {
+  return seat?.ai?.rank || gorToLabel(seat?.gor);
 }
 
 /* =====================================================================
@@ -198,10 +218,12 @@ function randomAIPlayerNames() {
 
 function makeAISeat(level, name) {
   const ai = {
-    id: `control-${level.id}`,
+    id: `catalog-${level.id}`,
     levelId: level.id,
     rank: level.rank,
     strength: level.strength,
+    reading: level.reading,
+    replyWeight: level.replyWeight,
   };
   return { userId: null, name, gor: level.gor, ws: null, ai };
 }
@@ -280,7 +302,7 @@ function publicState(room) {
   const cur = room.game.turn;
   const player = seat => seat && {
     name: seat.name,
-    rank: gorToLabel(seat.gor),
+    rank: seatRankLabel(seat),
     ai: !!seat.ai,
     aiLevel: seat.ai?.levelId || null,
     online: seat.ai ? true : !!seat.ws,
@@ -336,8 +358,8 @@ async function mcSpeak(kind = 'idle', extra = {}, force = false) {
   const room = programRoom && rooms.get(programRoom);
   const ctx = room
     ? contextFromRoom(room, {
-        blackRank: gorToLabel(room.seats[BLACK]?.gor),
-        whiteRank: gorToLabel(room.seats[WHITE]?.gor),
+        blackRank: seatRankLabel(room.seats[BLACK]),
+        whiteRank: seatRankLabel(room.seats[WHITE]),
         ...extra,
       })
     : { size: 9, komi: 1.5, moveCount: 0, turn: BLACK, capB: 0, capW: 0,
@@ -528,7 +550,7 @@ function maybeAIMove(room) {
   const delay = AI_DELAY_MS + Math.random() * AI_DELAY_MS * 2;   // ให้ดูเหมือนกำลังคิด
   setTimeout(() => {
     if (room.state !== 'playing' || room.game.turn !== c) return;
-    const mv = AI.chooseMove(room.game, c, seat.ai.strength);
+    const mv = AI.chooseMove(room.game, c, seat.ai);
     if (mv.pass) doPass(room, c); else doPlay(room, c, mv.x, mv.y);
   }, delay);
 }
@@ -563,7 +585,7 @@ async function saveGame(room, result) {
     score_white: result.score?.white ?? null,
     sgf: room.game.toSGF({
       playerBlack: b?.name, playerWhite: w?.name,
-      blackRank: gorToLabel(b?.gor), whiteRank: gorToLabel(w?.gor),
+      blackRank: seatRankLabel(b), whiteRank: seatRankLabel(w),
       event: 'Go Battle Live', date: new Date().toISOString().slice(0, 10),
     }),
     rated,
@@ -860,7 +882,14 @@ async function handle(ws, m) {
       }
       identity.token = m.playerToken || Math.random().toString(36).slice(2) + Date.now().toString(36);
       ws.identity = identity;
-      send(ws, { t: 'welcome', playerToken: identity.token, name: identity.name, guest: identity.guest, dbOn: DB_ON });
+      send(ws, {
+        t: 'welcome',
+        playerToken: identity.token,
+        name: identity.name,
+        guest: identity.guest,
+        dbOn: DB_ON,
+        aiLevels: AI_LEVELS.map(({ id, rank }) => ({ id, rank })),
+      });
       send(ws, { t: 'manifest', ...SETTINGS.manifest() });
       return;
     }
@@ -876,9 +905,12 @@ async function handle(ws, m) {
       ws.room = room.code;
 
       if (m.vsAI) {
-        const ai = m.ai || { id: 'seed15k', name: 'น้องเมล็ด', rank: '15 คิว', strength: 0.32 };
+        const requested = String(m.aiLevel || m.ai?.levelId || m.ai?.id || '');
+        const levelId = LEGACY_AI_LEVEL_IDS[requested] || requested;
+        const level = AI_LEVEL_BY_ID.get(levelId) || AI_LEVEL_BY_ID.get('foundation');
+        const [name] = randomAIPlayerNames();
         const other = color === BLACK ? WHITE : BLACK;
-        room.seats[other] = { userId: null, name: ai.name, gor: ai.gor ?? 600, ws: null, ai };
+        room.seats[other] = makeAISeat(level, name);
         room.ready[other] = true;
       }
       send(ws, { t: 'joined', code: room.code, color: color === BLACK ? 'B' : 'W' });

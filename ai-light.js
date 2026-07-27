@@ -1,13 +1,17 @@
 /* =====================================================================
  * GO BATTLE LIVE — ai-light.js  v1.0
- * AI ชั้นเบา สำหรับระดับ 20–13 คิว  (ไม่ต้องใช้เซิร์ฟเวอร์ AI แยก)
+ * AI ชั้นเบาแบบหลายระดับ 30 คิว–โปรโลก  (ไม่ต้องใช้เซิร์ฟเวอร์ AI แยก)
  *
  * วิธีคิด: heuristic ล้วน ไม่มี neural net
  *   1. จับกินได้ -> กินหมู่ที่ใหญ่ที่สุด
  *   2. หมู่ตัวเองโดนอาตาริ -> หนีหรือกินคืน
  *   3. ที่เหลือ -> สุ่มแบบถ่วงน้ำหนัก ชอบจุดใกล้หมากเดิม เลี่ยงตาตัวเอง
  *
- * strength 0..1 : ยิ่งต่ำยิ่งพลาดบ่อย (ใช้กำหนดระดับคิว)
+ * strength 0..1 : ยิ่งต่ำยิ่งพลาดบ่อย
+ * reading        : จำนวนตาผู้สมัครที่อ่านคำตอบของคู่แข่งล่วงหน้า
+ *
+ * หมายเหตุ: ชื่อระดับโปรเป็นระดับจำลองภายในเกม ไม่ใช่เอนจิน neural-net
+ * ที่ได้รับการรับรองว่ามีฝีมือเทียบเท่านักหมากล้อมอาชีพจริง
  * ===================================================================== */
 
 const { BLACK, WHITE, EMPTY } = require('./go-engine.js');
@@ -114,25 +118,82 @@ function scoreMove(game, x, y, c, strength) {
   return s;
 }
 
+function normalizeProfile(profile) {
+  if (typeof profile === 'number') {
+    return { strength: Math.max(0, Math.min(1, profile)), reading: 0, replyWeight: 0 };
+  }
+  const strength = Number(profile?.strength ?? 0.35);
+  const reading = Number(profile?.reading ?? 0);
+  const replyWeight = Number(profile?.replyWeight ?? 0);
+  return {
+    strength: Math.max(0, Math.min(1, Number.isFinite(strength) ? strength : 0.35)),
+    reading: Math.max(0, Math.min(10, Number.isFinite(reading) ? Math.floor(reading) : 0)),
+    replyWeight: Math.max(0, Math.min(1, Number.isFinite(replyWeight) ? replyWeight : 0)),
+  };
+}
+
+function cloneForSearch(game) {
+  const copy = new game.constructor({ size: game.size, komi: game.komi, handicap: 0 });
+  copy.board.set(game.board);
+  copy.prisoners = { ...game.prisoners };
+  copy.history = game.history.map(move => ({ ...move }));
+  copy.koPoint = game.koPoint;
+  copy.turn = game.turn;
+  copy.passes = game.passes;
+  copy.state = game.state;
+  copy.result = game.result ? { ...game.result } : null;
+  copy.positionCounts = new Map(game.positionCounts);
+  return copy;
+}
+
 /**
  * เลือกตาเดินของ AI
  * @param {GoGame} game
  * @param {number} color BLACK/WHITE
- * @param {number} strength 0..1 (0.15≈20คิว, 0.35≈15คิว, 0.6≈10คิว)
+ * @param {number|object} profile ค่า strength เดิม หรือโปรไฟล์ strength/reading/replyWeight
  * @returns {{pass:boolean, x?:number, y?:number}}
  */
-function chooseMove(game, color, strength = 0.35) {
+function chooseMove(game, color, profile = 0.35) {
+  const cfg = normalizeProfile(profile);
   const moves = legalMoves(game, color);
   if (moves.length === 0) return { pass: true };
 
-  let best = null, bestScore = -Infinity;
-  for (const [x, y] of moves) {
-    const sc = scoreMove(game, x, y, color, strength);
-    if (sc > bestScore) { bestScore = sc; best = [x, y]; }
+  const ranked = moves
+    .map(([x, y]) => ({ x, y, score: scoreMove(game, x, y, color, cfg.strength) }))
+    .sort((a, b) => b.score - a.score);
+
+  if (cfg.reading === 0 || ranked.length === 1) {
+    return { pass: false, x: ranked[0].x, y: ranked[0].y };
   }
-  return { pass: false, x: best[0], y: best[1] };
+
+  // ระดับสูงอ่านคำตอบที่ดีที่สุดของคู่แข่งหนึ่งชั้น เฉพาะผู้สมัครอันดับต้น ๆ
+  // เพื่อให้เซิร์ฟเวอร์ยังตอบสนองเร็วแม้เล่นบนกระดาน 19×19
+  let best = ranked[0], bestValue = -Infinity;
+  for (const candidate of ranked.slice(0, cfg.reading)) {
+    const next = cloneForSearch(game);
+    const played = next.play(candidate.x, candidate.y, color);
+    if (!played.ok) continue;
+
+    const foe = opposite(color);
+    const replies = legalMoves(next, foe);
+    let replyBest = 0;
+    for (const [x, y] of replies) {
+      replyBest = Math.max(replyBest, scoreMove(next, x, y, foe, 1));
+    }
+    const value = candidate.score - replyBest * cfg.replyWeight;
+    if (value > bestValue) { bestValue = value; best = candidate; }
+  }
+  return { pass: false, x: best.x, y: best.y };
 }
 
-const STRENGTH_BY_RANK = { '20k': 0.10, '18k': 0.18, '15k': 0.32, '13k': 0.45, '10k': 0.60 };
+const STRENGTH_BY_RANK = {
+  '30k': 0.02, '25k': 0.06, '20k': 0.12, '15k': 0.20, '12k': 0.30,
+  '10k': 0.38, '8k': 0.47, '5k': 0.56, '3k': 0.65, '1k': 0.72,
+  '1d': 0.80, '3d': 0.86, '5d': 0.90, '7d': 0.93, '9d': 0.95,
+  '1p': 0.97, '3p': 0.98, '6p': 0.99, '9p': 1.00,
+};
 
-module.exports = { chooseMove, legalMoves, isOwnEye, territoryOwner, STRENGTH_BY_RANK };
+module.exports = {
+  chooseMove, legalMoves, isOwnEye, territoryOwner, normalizeProfile, cloneForSearch,
+  STRENGTH_BY_RANK,
+};

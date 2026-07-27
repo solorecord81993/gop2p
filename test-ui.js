@@ -117,6 +117,13 @@ for (const file of PAGES) {
        declared.has('liUser') && declared.has('suUser'));
     ok('แปลงชื่อผู้ใช้เป็นอีเมลภายในให้อัตโนมัติ',
        script.includes('USER_DOMAIN') && script.includes('toEmail'));
+    ok('หน้าผู้เล่นเลือกระดับ AI ได้หลายขั้นถึง World Pro',
+       declared.has('selAI') && script.includes('DEFAULT_AI_LEVELS') &&
+       script.includes("id:'firstSteps'") && script.includes("id:'worldPro'") &&
+       script.includes("rank:'9p'"));
+    ok('ส่งเฉพาะรหัสระดับให้เซิร์ฟเวอร์เป็นผู้กำหนดความเก่ง',
+       script.includes("aiLevel:$('selAI').value") &&
+       !script.includes('strength:+strength') && !script.includes('gor:+gor'));
   }
 }
 

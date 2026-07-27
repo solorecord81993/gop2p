@@ -1,4 +1,5 @@
 const {GoGame,BLACK,WHITE,EMPTY} = require('./go-engine.js');
+const AI = require('./ai-light.js');
 let pass=0,fail=0;
 const t=(name,cond)=>{cond?(pass++,console.log('  ok  '+name)):(fail++,console.log('  FAIL '+name));};
 
@@ -61,10 +62,14 @@ t('ผ่านสองครั้งเข้าเฟส marking', pr.enterM
 g=new GoGame({size:9,handicap:4});
 t('แต้มต่อ 4 เม็ด โคมิ=0 ขาวเดินก่อน', g.komi===0 && g.turn===WHITE && g.board.filter(v=>v===BLACK).length===4);
 
+// 10 โปรไฟล์ระดับสูงต้องอ่านตาตอบและยังคืนตาที่ถูกกติกา
+g=new GoGame({size:9});
+const proMove=AI.chooseMove(g,BLACK,{strength:1,reading:10,replyWeight:.85});
+t('โปรไฟล์ World Pro อ่านตาตอบและเลือกตาที่ถูกกติกา',
+  !proMove.pass && g.isLegal(proMove.x,proMove.y,BLACK));
 
 // ── ทดสอบความทนทาน: ให้ AI เล่นกันเอง 150 เกม ดูว่าไม่ล่มและนับแต้มได้เสมอ ──
 {
-  const AI = require('./ai-light.js');
   let games=0, crashes=0, badScore=0, totalMoves=0, noResult=0;
   for (let n=0;n<150;n++){
     const size=[9,13][n%2];
