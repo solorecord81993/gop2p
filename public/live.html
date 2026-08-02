@@ -273,10 +273,15 @@ const T = (k, v) => I.T(k, v, LANG);
  */
 const Speech = (() => {
   let enabled = false, voices = [];
-  const supported = typeof speechSynthesis !== 'undefined';
-  function loadVoices(){ if (supported) voices = speechSynthesis.getVoices() || []; }
-  if (supported && typeof speechSynthesis.addEventListener === 'function') {
-    speechSynthesis.addEventListener('voiceschanged', loadVoices);
+  const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
+  const Utterance = typeof window !== 'undefined' ? window.SpeechSynthesisUtterance : null;
+  const supported = !!(synth && Utterance);
+  function loadVoices(){ if (supported) voices = synth.getVoices() || []; }
+  function resume(){
+    try { if (supported && typeof synth.resume === 'function') synth.resume(); } catch {}
+  }
+  if (supported && typeof synth.addEventListener === 'function') {
+    synth.addEventListener('voiceschanged', loadVoices);
   }
   function pick(lang){
     const code = I.SPEECH_LANG[lang] || 'th-TH';
@@ -289,26 +294,35 @@ const Speech = (() => {
       if (!supported) return false;
       enabled = true; loadVoices();
       try {
-        const u = new SpeechSynthesisUtterance(' ');
-        u.volume = 0; speechSynthesis.speak(u);
-      } catch { return false; }
+        // Must happen synchronously inside the user's tap. Awaiting the
+        // AudioContext first loses iOS/Safari's user-activation permission.
+        synth.cancel();
+        resume();
+      } catch { enabled = false; return false; }
       return true;
     },
     say(text, lang){
       if (!enabled || !supported || !text) return false;
       try {
-        if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(text);
+        resume();
+        if (synth.speaking || synth.pending) synth.cancel();
+        const u = new Utterance(String(text));
         u.lang = I.SPEECH_LANG[lang] || 'th-TH';
         const v = pick(lang); if (v) u.voice = v;
         u.rate = 1.05;
-        speechSynthesis.speak(u);
+        u.onerror = e => {
+          if (e.error !== 'interrupted' && e.error !== 'canceled') {
+            console.warn('พูดไม่ได้', e.error || 'speech error');
+          }
+        };
+        synth.speak(u);
+        resume();
         return true;
       } catch (e) { console.warn('พูดไม่ได้', e); return false; }
     },
     stop(){
       if (!supported) return;
-      try { speechSynthesis.cancel(); } catch {}
+      try { synth.cancel(); resume(); } catch {}
     },
     get supported(){ return supported; },
   };
@@ -501,12 +515,18 @@ async function keepAwake(){
 }
 
 $('btnBoot').onclick = async () => {
-  await Snd.unlock();
-  Speech.unlock();
+  // Keep Speech.unlock() before the first await. On iOS/Safari the user
+  // activation is otherwise lost and later WebSocket messages stay silent.
+  const speechReady = Speech.unlock();
+  const audioReady = Snd.unlock();
   keepAwake();
   $('boot').style.display = 'none';
   fit();
   fetch('/api/manifest').then(r => r.json()).then(applyManifest).catch(() => {});
+  if (speechReady) {
+    speakMC(lastMCText || T('live.readyVoice'), lastMCLang || LANG);
+  }
+  await audioReady;
 };
 
 /* ── ควบคุมเสียง MC แยกจากเพลง ──
@@ -516,6 +536,8 @@ $('btnBoot').onclick = async () => {
 let mcAutoEnabled = true;
 let voiceSeq = 0;
 let voiceTimer = null;
+let lastMCText = '';
+let lastMCLang = LANG;
 function stopMCVoice(){
   voiceSeq++;
   clearTimeout(voiceTimer);
@@ -564,6 +586,8 @@ function connect(){
     if (m.t === 'custom_cutscene') playCustomCutscene(m);
     if (m.t === 'mc'){
       if (!mcAutoEnabled) return;
+      lastMCText = String(m.text || '');
+      lastMCLang = m.lang || LANG;
       setMC(m.text);
       if (!program) $('idleMcText').textContent = m.text;
       speakMC(m.text, m.lang || LANG);
