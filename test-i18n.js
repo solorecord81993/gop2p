@@ -5,7 +5,8 @@
 const fs = require('fs');
 const path = require('path');
 const { DICT, LANGS, T, rankLabel } = require('./i18n.js');
-const { CANNED } = require('./mc.js');
+const { GoGame } = require('./go-engine.js');
+const { CANNED, contextFromRoom, cannedForContext } = require('./mc.js');
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {
@@ -68,6 +69,18 @@ for (const L of LANGS) {
 ok('คำพากย์สำรองของ MC ครบทุกภาษาและทุกหมวด', mcMissing.length === 0, mcMissing.join(', '));
 ok('คำพากย์ตอนเงียบมีให้เลือกอย่างน้อย 4 แบบต่อภาษา',
    LANGS.every(L => CANNED[L].idle.length >= 4));
+
+const mcGame = new GoGame({ size: 9, komi: 1.5 });
+const mcContext = contextFromRoom({
+  game: mcGame,
+  seats: { 1: { name: 'นนท์' }, 2: { name: 'มินตรา' } },
+  clocks: { 1: {}, 2: {} },
+});
+const contextualLine = cannedForContext({ ...mcContext, lang: 'th' }, 'idle');
+ok('คำพากย์สำรองอิงชื่อผู้เล่นและสถานะนำตามจริง',
+   contextualLine.includes('นนท์') && contextualLine.includes('มินตรา') && /นำ|ตาม|สูสี/.test(contextualLine), contextualLine);
+ok('คำพากย์สำรองชวนกดไลก์และกดแชร์',
+   contextualLine.includes('ไลก์') && contextualLine.includes('แชร์'), contextualLine);
 
 // ---- 6. ฟังก์ชันแปลทำงานถูกต้อง ----
 ok('แทนค่าตัวแปรได้', T('rank.kyu', { n: 7 }, 'th') === '7 คิว', T('rank.kyu', { n: 7 }, 'th'));

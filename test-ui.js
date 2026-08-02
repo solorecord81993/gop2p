@@ -75,6 +75,12 @@ for (const file of PAGES) {
     ok('มีระบบพูดออกเสียงข้อความ MC',
        script.includes('SpeechSynthesisUtterance') && script.includes('Speech.say'));
     ok('ปลดล็อกเสียงพูดตอนกดปุ่มเริ่ม', script.includes('Speech.unlock()'));
+    ok('ปิด MC แล้วหยุดเสียงพูดและคืนเพลงได้',
+       script.includes('mc_stop') && script.includes('Speech.stop()') &&
+       script.includes('Snd.duck(false)'));
+    ok('เพลงมีระบบ resume และกู้คืนเมื่อหน้า Live กลับมาแสดง',
+       script.includes('Snd.resume()') && script.includes('Snd.ensureBGM()') &&
+       script.includes('source.loop = true'));
     ok('จอว่างมี QR ลิงก์ และคำเชิญของ MC',
        declared.has('joinQr') && declared.has('joinLink') && declared.has('idleMcText'));
     ok('มีการ์ดสรุปคะแนนจริงหลังเกมจบ',

@@ -795,6 +795,10 @@ async function testMC(port) {
   D.send({ t:'program', code:r.code }); await D.wait('program');
   const onAir = await L.wait('mc', 4000);
   ok('MC พูดตอนสลับห้องขึ้นภาพ', !!onAir.text, onAir.text);
+  ok('MC ระบุชื่อผู้เล่นทั้งสองคนและสถานะนำตาม',
+     onAir.text.includes('ก') && onAir.text.includes('ข') && /นำ|ตาม|สูสี/.test(onAir.text), onAir.text);
+  ok('MC ชวนผู้ชมกดไลก์และกดแชร์เป็นกำลังใจ',
+     /ไลก์/.test(onAir.text) && /แชร์/.test(onAir.text), onAir.text);
 
   // เดินหมากแล้วต้องมีพากย์ตามมา
   A.send({ t:'ready' }); B.send({ t:'ready' });
@@ -820,18 +824,25 @@ async function testMC(port) {
   D.send({ t:'mc_lang', lang:'en' });
   await D.wait('mc_lang');
   const enLine = await L.waitWhere('mc', m => m.lang === 'en', 4000);
+  const enWithoutThaiNames = enLine.text.replace(/[กข]/g, '');
   ok('เปลี่ยนเป็นอังกฤษได้และไม่มีอักษรไทยปน',
-     !/[\u0E00-\u0E7F]/.test(enLine.text), enLine.text);
+     !/[\u0E00-\u0E7F]/.test(enWithoutThaiNames), enLine.text);
 
   // ปิดพากย์อัตโนมัติ
   D.send({ t:'mc_auto', value:false });
   const off = await D.wait('mc_auto');
   ok('ปิดพากย์อัตโนมัติได้', off.value === false);
+  const liveOff = await L.waitWhere('mc_info', m => m.auto === false, 3000);
+  const stopped = await L.wait('mc_stop', 3000);
+  ok('ปิด MC แล้วแจ้งหน้าไลฟ์ให้หยุดเสียงทันที', liveOff.auto === false && stopped.t === 'mc_stop');
   L.inbox.length = 0;
   A.send({ t:'play', x:7, y:7 });
   await sleep(1200);
   ok('ปิดแล้วไม่พากย์อีก', !L.inbox.some(m => m.t === 'mc'));
   D.send({ t:'mc_auto', value:true }); await D.wait('mc_auto');
+  const liveOn = await L.waitWhere('mc_info', m => m.auto === true, 3000);
+  const resumed = await L.wait('mc', 5000);
+  ok('เปิด MC กลับมาแล้วมีเสียงพากย์ใหม่ทันที', liveOn.auto === true && !!resumed.text, resumed.text);
   D.send({ t:'mc_lang', lang:'th' }); await D.wait('mc_lang');
 
   A.close(); B.close(); D.close(); L.close();
