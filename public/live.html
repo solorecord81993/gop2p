@@ -269,7 +269,8 @@ let LANG = ['th','en','ja'].includes(P.get('lang')) ? P.get('lang') : 'th';
 const T = (k, v) => I.T(k, v, LANG);
 
 /* ── เสียงพากย์ MC ──
- * ใช้ speechSynthesis ของเบราว์เซอร์ ไม่ต้องพึ่งบริการภายนอก
+ * ถ้าเครื่องมีเสียงผู้ชายในภาษานั้น ให้ใช้เสียงนั้นก่อน
+ * ถ้าไม่มีจึงถอยไปใช้ TTS proxy ของ server เพื่อไม่ให้ไลฟ์เงียบ
  * iPhone ต้องมีการแตะก่อนหนึ่งครั้งถึงจะพูดได้ — ปุ่ม "แตะเพื่อเริ่ม" ทำหน้าที่นั้น
  */
 const Speech = (() => {
@@ -277,6 +278,11 @@ const Speech = (() => {
   const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
   const Utterance = typeof window !== 'undefined' ? window.SpeechSynthesisUtterance : null;
   const supported = !!(synth && Utterance);
+  const MALE_HINTS = Object.freeze({
+    th: ['niwat', 'nivat', 'nawat', 'pattara', 'kittisak', 'somsak', 'lek'],
+    en: ['alex', 'daniel', 'david', 'fred', 'guy', 'james', 'george', 'oliver', 'tom', 'aaron', 'arthur', 'mark'],
+    ja: ['otoya', 'ichiro', 'hattori', 'takumi', 'kenji', 'naoki', 'shinji', 'hiroshi'],
+  });
   function loadVoices(){ if (supported) voices = synth.getVoices() || []; }
   function resume(){
     try { if (supported && typeof synth.resume === 'function') synth.resume(); } catch {}
@@ -284,11 +290,21 @@ const Speech = (() => {
   if (supported && typeof synth.addEventListener === 'function') {
     synth.addEventListener('voiceschanged', loadVoices);
   }
-  function pick(lang){
+  function languageVoices(lang){
     const code = I.SPEECH_LANG[lang] || 'th-TH';
-    return voices.find(v => v.lang === code)
-        || voices.find(v => (v.lang || '').toLowerCase().startsWith(lang))
-        || null;
+    return voices.filter(v => v.lang === code)
+      .concat(voices.filter(v => v.lang !== code && (v.lang || '').toLowerCase().startsWith(lang)));
+  }
+  function pick(lang, maleOnly = false){
+    loadVoices();
+    const candidates = languageVoices(lang);
+    if (!maleOnly) return candidates[0] || null;
+    const hints = MALE_HINTS[lang] || [];
+    return candidates.find(v => {
+      const meta = `${v.name || ''} ${v.voiceURI || ''} ${v.gender || ''}`.toLowerCase();
+      if (/\bfemale\b|\bwoman\b|\bgirl\b/.test(meta)) return false;
+      return v.gender === 'male' || /\bmale\b/.test(meta) || hints.some(h => meta.includes(h));
+    }) || null;
   }
   return {
     unlock(){
@@ -302,7 +318,7 @@ const Speech = (() => {
       } catch { enabled = false; return false; }
       return true;
     },
-    say(text, lang, onend){
+    say(text, lang, onend, options = {}){
       if (!enabled || !supported || !text) return false;
       try {
         resume();
@@ -315,7 +331,9 @@ const Speech = (() => {
           if (typeof onend === 'function') onend();
         };
         u.lang = I.SPEECH_LANG[lang] || 'th-TH';
-        const v = pick(lang); if (v) u.voice = v;
+        const v = pick(lang, options.maleOnly === true);
+        if (options.maleOnly === true && !v) return false;
+        if (v) u.voice = v;
         u.rate = 1.05;
         u.onend = done;
         u.onerror = e => {
@@ -333,6 +351,7 @@ const Speech = (() => {
       if (!supported) return;
       try { synth.cancel(); resume(); } catch {}
     },
+    hasMale(lang){ return !!pick(lang, true); },
     get supported(){ return supported; },
   };
 })();
@@ -663,6 +682,18 @@ function finishMCVoice(seq){
 function startMCVoice(item){
   const seq = ++voiceSeq;
   activeVoice = { ...item, seq };
+
+  // Prefer a male voice already installed in the device. The server TTS
+  // remains the reliable fallback when Safari/Chrome has no matching voice.
+  const nativeMale = Speech.say(item.text, item.lang,
+    () => finishMCVoice(seq), { maleOnly: true });
+  if (nativeMale) {
+    Snd.duck(true);
+    nativeVoiceTimer = setTimeout(() => finishMCVoice(seq),
+      Math.min(12000, 1400 + String(item.text || '').length * 90));
+    return;
+  }
+
   Snd.playVoice(item.text, item.lang,
     () => finishMCVoice(seq),
     () => {

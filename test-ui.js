@@ -74,6 +74,9 @@ for (const file of PAGES) {
        !T('live.waitBody', {}, 'th').includes('/director'));
     ok('มีระบบพูดออกเสียงข้อความ MC',
        script.includes('SpeechSynthesisUtterance') && script.includes('Speech.say'));
+    ok('พยายามเลือกเสียงผู้ชายจากเสียงที่มีในเครื่องก่อน',
+       script.includes('MALE_HINTS') && script.includes('maleOnly') &&
+       script.includes('const nativeMale = Speech.say'));
     ok('ปลดล็อกเสียงพูดตอนกดปุ่มเริ่ม', script.includes('Speech.unlock()'));
     const bootSpeech = script.indexOf('const speechReady = Speech.unlock()');
     const bootAudio = script.indexOf('const audioReady = Snd.unlock()');
