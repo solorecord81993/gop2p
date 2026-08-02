@@ -4,6 +4,7 @@
  * ===================================================================== */
 process.env.AI_DELAY_MS   = process.env.AI_DELAY_MS   ?? '0';    // ทดสอบให้เร็ว ไม่ต้องหน่วง
 process.env.AUTO_DWELL_MS = process.env.AUTO_DWELL_MS ?? '600';  // ย่นเวลาค้างห้องตอนทดสอบ
+process.env.AUTO_FINISHED_HOLD_MS = process.env.AUTO_FINISHED_HOLD_MS ?? '500';
 process.env.MC_MIN_GAP_MS = process.env.MC_MIN_GAP_MS ?? '300';  // ให้ MC พูดถี่ขึ้นตอนทดสอบ
 process.env.MC_IDLE_MS    = process.env.MC_IDLE_MS    ?? '900';
 process.env.AI_RESULT_HOLD_MS = process.env.AI_RESULT_HOLD_MS ?? '120';
@@ -341,7 +342,7 @@ async function testAIResultHold() {
   endGame(room, { type:'black_win', text:'B+1.5', score }, { score });
   ok('สถานะจบมีคะแนนจริงและกำหนดเวลาปิด',
      room.state === 'finished' && room.score.black === 12 &&
-     room.autoCloseAt >= before + 100);
+     room.finishedAt >= before && room.autoCloseAt >= before + 100);
   await sleep(220);
   ok('ครบเวลาค้างแล้วปิดห้อง AI อัตโนมัติ', !rooms.has(room.code));
 }
@@ -724,6 +725,31 @@ async function testAutoBroadcast(port) {
   const sfx = await L.wait('sfx', 3000);
   ok('เสียงวางหมากถึงหน้าออกอากาศ (ไม่ใช่แค่ฝั่งผู้เล่น)', sfx.id === 'stone');
 
+  // มีสองห้องที่กำลังเล่น ระบบอัตโนมัติต้องหมุนไปห้องถัดไปตามรอบ
+  // แม้ห้องแรกจะมีค่า heat สูงกว่า ไม่ใช่เลือกห้องเดิมซ้ำตลอด
+  const C = new Client(port), E = new Client(port);
+  await Promise.all([C.ready, E.ready]);
+  C.send({ t:'auth', name:'ค' }); E.send({ t:'auth', name:'ง' });
+  await C.wait('welcome'); await E.wait('welcome');
+  C.send({ t:'create', size:9, timeRule:{ main:300, byoyomi:30, periods:3 } });
+  const r2 = await C.wait('joined');
+  E.send({ t:'join', code:r2.code }); await E.wait('joined');
+  C.send({ t:'ready' }); E.send({ t:'ready' });
+  await C.waitState(s => s.state === 'playing');
+  const toSecond = await L.waitWhere('program', m => m.code === r2.code, 3000);
+  ok('โหมดอัตโนมัติหมุนไปห้องถัดไปหลังครบช่วงเวลา', toSecond.code === r2.code);
+  const backToFirst = await L.waitWhere('program', m => m.code === r.code, 3000);
+  ok('โหมดอัตโนมัติหมุนกลับห้องแรกในรอบถัดไป', backToFirst.code === r.code);
+
+  // เกมที่กำลังออกอากาศจบลง ต้องค้างผลไว้ก่อน ไม่สลับทันที
+  A.send({ t:'resign' });
+  const ended = await L.waitWhere('end', m => m.code === r.code, 3000);
+  await sleep(100);
+  ok('เกมจบแล้วมีช่วงค้างผลก่อนสลับห้อง',
+     ended.code === r.code && !L.inbox.some(m => m.t === 'program' && m.code === r2.code));
+  const afterFinish = await L.waitWhere('program', m => m.code === r2.code, 3000);
+  ok('ครบช่วงค้างผลแล้วจึงสลับไปห้องอื่น', afterFinish.code === r2.code);
+
   // ผู้กำกับเข้ามาคุมเอง = ปิดโหมดอัตโนมัติ
   D.send({ t:'program', code:r.code });
   await D.wait('program');
@@ -737,7 +763,7 @@ async function testAutoBroadcast(port) {
   ok('มีปุ่มแตะเพื่อเริ่ม สำหรับปลดล็อกเสียงและกันจอดับ',
      html.includes('btnBoot') && html.includes('wakeLock'));
 
-  A.close(); B.close(); D.close(); L.close();
+  A.close(); B.close(); C.close(); E.close(); D.close(); L.close();
 }
 
 

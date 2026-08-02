@@ -24,6 +24,8 @@ ZIP นี้เตรียม `server.js` และ `vercel.json` สำหร
 | `SUPABASE_SERVICE_KEY` | แนะนำ | Supabase `service_role` key; ห้ามเผยแพร่ฝั่ง browser |
 | `AI_DELAY_MS` | ไม่ | `600` — เวลาคิดของ AI ต่อหนึ่งตา |
 | `AI_RESULT_HOLD_MS` | ไม่ | `60000` — ค้างสรุปผล AI 1 นาทีก่อนปิดห้อง |
+| `AUTO_DWELL_MS` | ไม่ | `60000` — โหมดอัตโนมัติค้างเกมที่ยังเล่นอยู่ 1 นาทีก่อนสลับ |
+| `AUTO_FINISHED_HOLD_MS` | ไม่ | `10000` — เกมจบแล้วค้างผล 10 วินาทีก่อนสลับ |
 | `KATAGO_API_URL` | ถ้าจะใช้ Neural | HTTPS endpoint ของ KataGo Analysis Engine |
 | `KATAGO_API_KEY` | แนะนำ | Bearer key ของ KataGo endpoint |
 | `KATAGO_MAX_VISITS` | ไม่ | `1600` — จำนวน visits ของ Neural Superhuman |

@@ -17,6 +17,10 @@ services:
         value: "600"
       - key: AI_RESULT_HOLD_MS
         value: "60000"
+      - key: AUTO_DWELL_MS
+        value: "60000"
+      - key: AUTO_FINISHED_HOLD_MS
+        value: "10000"
       - key: KATAGO_MAX_VISITS
         value: "32"
       - key: KATAGO_ROOT_SYMMETRIES
