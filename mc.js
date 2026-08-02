@@ -34,6 +34,24 @@ const CFG = {
   timeoutMs: Number(process.env.MC_TIMEOUT_MS ?? 4000),
 };
 
+const GO_COMMENTARY_GUARDRAILS = Object.freeze([
+  'This is the board game Go, also called baduk or weiqi, played with black and white stones on a Go board.',
+  'The participants are Go players; never infer a profession, nationality, or sport from their names.',
+  'Use Go vocabulary such as stones, groups, territory, captures, liberties, ko, komi, byo-yomi, pass, resign, and score.',
+  'Never mention golf, golfers, athletes, clubs, holes, balls, fairways, swings, strokes, teams, or any unrelated sport.',
+]);
+
+const WRONG_GAME_COMMENTARY_PATTERNS = Object.freeze([
+  /กอล์ฟ|นักกอล์ฟ|นักกีฬา|ฟุตบอล|เทนนิส|บาสเกตบอล|เบสบอล|วอลเลย์บอล/iu,
+  /\b(golf|golfer|athlete|fairway|birdie|bogey|putt|putting|tee shot|football|soccer|basketball|tennis|baseball|volleyball|hole|swing|stroke)\b/i,
+  /ゴルフ|ゴルファー|スポーツ|サッカー|テニス|野球|バスケットボール/iu,
+]);
+
+function isWrongGameCommentary(text) {
+  const value = String(text || '');
+  return WRONG_GAME_COMMENTARY_PATTERNS.some(pattern => pattern.test(value));
+}
+
 /* =====================================================================
  * คำพากย์สำเร็จรูป — ใช้เมื่อ AI ใช้ไม่ได้
  * เขียนให้พูดวนได้โดยไม่น่าเบื่อ และไม่อ้างสถานการณ์ที่อาจไม่จริง
@@ -42,29 +60,29 @@ const CANNED = {
   th: {
     invite: [
       'สแกน QR เข้ามาสร้างเกมและเล่นกับเพื่อนหรือ AI ได้เลยครับ',
-      'ถ้าอยากลงสนามเอง สแกน QR แล้วสร้างเกมได้เลยครับ',
+      'ถ้าอยากลงเล่นหมากล้อมเอง สแกน QR แล้วสร้างเกมได้เลยครับ',
       'ใครพร้อมประลองหมากล้อมกับเพื่อนหรือ AI เชิญสแกน QR ได้เลยครับ',
       'กดไลก์กดแชร์เป็นกำลังใจให้ผู้เล่นของเราได้นะครับ',
     ],
     idle: [
       'ฝากกดไลก์กดแชร์เป็นกำลังใจให้ผู้เล่นทั้งสองคนด้วยนะครับ',
-      'ทุกไลก์ทุกแชร์ช่วยเติมกำลังใจให้นักหมากล้อมของเราครับ',
+      'ทุกไลก์ทุกแชร์ช่วยเติมกำลังใจให้ผู้เล่นหมากล้อมของเราครับ',
       'ถ้าชอบเกมนี้ช่วยกดไลก์กดแชร์ให้ผู้เล่นด้วยนะครับ',
       'ร่วมส่งกำลังใจให้การแข่งขันหมากล้อมคู่นี้ด้วยการกดไลก์กดแชร์ครับ',
       'เกมยังมีหลายจังหวะให้ลุ้นครับ ฝากช่วยเชียร์ผู้เล่นด้วยไลก์และแชร์นะครับ',
       'ใครกำลังดูอยู่ ส่งแรงใจให้ทั้งสองฝ่ายกันหน่อยครับ',
     ],
     move:    ['ตานี้มีผลกับรูปเกมมากครับ ฝากกดไลก์กดแชร์เป็นกำลังใจด้วยนะครับ', 'ผู้เล่นกำลังวางแผนอย่างเต็มที่ ช่วยกดไลก์กดแชร์ให้ทั้งคู่ครับ', 'หมากตานี้เปลี่ยนจังหวะเกมได้เลยครับ ฝากส่งกำลังใจด้วยการกดไลก์กดแชร์นะครับ', 'ทุกตาบนกระดานมีความหมาย ช่วยกดไลก์กดแชร์ให้ผู้เล่นด้วยครับ'],
-    capture: ['จับกินได้แล้วครับ ฝากกดไลก์กดแชร์เป็นกำลังใจให้ผู้เล่นทั้งคู่ด้วยนะครับ', 'หมู่นี้ถูกจับกิน รูปเกมเปลี่ยนทันทีครับ ช่วยกดไลก์กดแชร์ด้วยนะครับ', 'มีการปะทะครั้งใหญ่บนกระดานครับ ทุกไลก์ทุกแชร์ช่วยเชียร์ผู้เล่นได้มากเลย', 'เสียหมากไปหนึ่งกลุ่มครับ ฝากกดไลก์กดแชร์ให้กำลังใจทั้งสองฝ่ายนะครับ'],
+    capture: ['จับกินได้แล้วครับ ฝากกดไลก์กดแชร์เป็นกำลังใจให้ผู้เล่นทั้งคู่ด้วยนะครับ', 'กลุ่มนี้ถูกจับกิน รูปเกมเปลี่ยนทันทีครับ ช่วยกดไลก์กดแชร์ด้วยนะครับ', 'มีการปะทะครั้งใหญ่บนกระดานครับ ทุกไลก์ทุกแชร์ช่วยเชียร์ผู้เล่นได้มากเลย', 'เสียหมากไปหนึ่งกลุ่มครับ ฝากกดไลก์กดแชร์ให้กำลังใจทั้งสองฝ่ายนะครับ'],
     start:   [
       'เปิดกระดานใหม่แล้วครับ มาติดตามการแข่งขันหมากล้อมคู่นี้กัน ฝากกดไลก์กดแชร์ด้วยนะครับ',
       'เราไปดูกันต่อที่อีกหนึ่งเกมหมากล้อมครับ ช่วยส่งแรงเชียร์ให้ผู้เล่นทั้งคู่ด้วยนะครับ',
-      'พร้อมลุ้นเกมใหม่กันหรือยังครับ ฝากกดไลก์กดแชร์เป็นกำลังใจให้นักหมากล้อมของเราด้วยครับ',
+      'พร้อมลุ้นเกมใหม่กันหรือยังครับ ฝากกดไลก์กดแชร์เป็นกำลังใจให้ผู้เล่นหมากล้อมของเราด้วยครับ',
       'กระดานต่อไปมาแล้วครับ ใครจะคุมพื้นที่ได้ดีกว่า ฝากติดตามและช่วยเชียร์กันด้วยนะครับ',
       'ได้เวลาจับตาเกมหมากล้อมอีกคู่ครับ ทุกตาอาจเปลี่ยนรูปเกมได้เลย',
       'สลับมาที่กระดานใหม่แล้วครับ มาดูกันว่าผู้เล่นคู่นี้จะวางแผนกันอย่างไร',
       'อีกเกมกำลังรอให้เราไปลุ้นครับ ฝากกดไลก์กดแชร์ให้ผู้เล่นทั้งสองฝ่ายด้วยนะครับ',
-      'เปลี่ยนมุมมาดูเกมนี้กันครับ ขอแรงเชียร์ให้ทั้งคู่ก่อนเริ่มการต่อสู้บนกระดาน',
+      'เปลี่ยนมุมมาดูเกมนี้กันครับ ขอแรงเชียร์ให้ทั้งคู่ก่อนเริ่มเกมบนกระดาน',
     ],
     byoyomi: ['เวลาเข้าสู่ช่วงเบียวโยมิแล้วครับ ฝากกดไลก์กดแชร์ช่วยส่งกำลังใจให้ผู้เล่นด้วยนะครับ', 'เวลาน้อยลงทุกทีครับ ทุกไลก์ทุกแชร์ช่วยให้ผู้เล่นมีแรงสู้ต่อครับ'],
     end:     ['จบเกมแล้วครับ ขอบคุณทุกไลก์ทุกแชร์ที่ส่งกำลังใจให้ผู้เล่นนะครับ', 'ผลการแข่งขันออกแล้วครับ ฝากกดไลก์กดแชร์ให้ทั้งคู่และติดตามเกมต่อไปด้วยนะครับ'],
@@ -381,6 +399,7 @@ const LANG_NAME = { th: 'Thai', en: 'English', ja: 'Japanese' };
 function systemPrompt(lang, kind) {
   return [
     'You are a live commentator for an online Go (baduk/weiqi) match streamed on TikTok.',
+    ...GO_COMMENTARY_GUARDRAILS,
     `Reply ONLY in ${LANG_NAME[lang] || 'Thai'}.`,
     'Give exactly ONE spoken sentence, at most 20 words, suitable for text-to-speech.',
     'Be energetic and specific, but never invent facts that are not in the given state.',
@@ -396,6 +415,7 @@ function systemPrompt(lang, kind) {
 
 function describeState(ctx, lang, kind) {
   const L = [];
+  L.push('Game identity: Go (baduk/weiqi), not golf or another sport.');
   L.push(`Board ${ctx.size}x${ctx.size}, komi ${ctx.komi}.`);
   L.push(`Black: ${ctx.blackName} (${ctx.blackRank}). White: ${ctx.whiteName} (${ctx.whiteRank}).`);
   L.push(`Move ${ctx.moveCount}, ${ctx.turn === 1 ? 'Black' : 'White'} to play.`);
@@ -503,7 +523,7 @@ class MCEngine {
       const previous = [this.lastText, ...this.recentTexts].filter(Boolean);
       const accept = (candidate, source) => {
         const cleaned = cleanup(candidate);
-        if (!cleaned || isRepeatedText(cleaned, previous)) return false;
+        if (!cleaned || isWrongGameCommentary(cleaned) || isRepeatedText(cleaned, previous)) return false;
         text = cleaned;
         this.source = source;
         return true;
@@ -630,5 +650,7 @@ function configSummary() {
 
 module.exports = {
   MCEngine, contextFromRoom, estimatePosition, cannedForContext,
-  CANNED, pickCanned, cleanup, CFG, setConfig, configSummary,
+  CANNED, pickCanned, cleanup, CFG, GO_COMMENTARY_GUARDRAILS,
+  WRONG_GAME_COMMENTARY_PATTERNS, isWrongGameCommentary,
+  systemPrompt, setConfig, configSummary,
 };
