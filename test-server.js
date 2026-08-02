@@ -640,6 +640,7 @@ async function testLive(port) {
   const s1 = await L.wait('state');
   ok('ผู้กำกับกด TAKE แล้วหน้าไลฟ์เปลี่ยนห้องตาม', p1.code === r1.code && s1.code === r1.code);
   ok('มีชนิดทรานซิชันแนบมาด้วย', typeof p1.transition === 'string', String(p1.transition));
+  ok('program มีเลขรุ่นสำหรับแยกคำพากย์แต่ละกระดาน', Number.isInteger(p1.programEpoch));
 
   // ความเคลื่อนไหวของห้องที่ออกอากาศต้องถึงหน้าไลฟ์
   L.inbox.length = 0;
@@ -657,6 +658,7 @@ async function testLive(port) {
   D.send({ t:'program', code:r2.code, transition:'fade' });
   const p2 = await L.wait('program');
   ok('สลับไปห้องที่สองได้ พร้อมทรานซิชันที่สั่ง', p2.code === r2.code && p2.transition === 'fade');
+  ok('เลขรุ่นเพิ่มขึ้นเมื่อสลับกระดาน', p2.programEpoch > p1.programEpoch);
 
   // คัตซีนและ MC
   D.send({ t:'highlight', nameTh:'ค่ายกลย้อนศร', nameJa:'ウッテガエシ', tier:'SSR', coords:[[3,3]] });
@@ -665,7 +667,9 @@ async function testLive(port) {
 
   D.send({ t:'mc', text:'ตานี้ตัดสินเกมเลยครับ' });
   const mc = await L.waitWhere('mc', m => m.text === 'ตานี้ตัดสินเกมเลยครับ');
-  ok('ผู้กำกับส่งข้อความ MC เองได้', mc.text === 'ตานี้ตัดสินเกมเลยครับ');
+  ok('ผู้กำกับส่งข้อความ MC เองได้และผูกกับกระดานปัจจุบัน',
+     mc.text === 'ตานี้ตัดสินเกมเลยครับ' && mc.kind === 'manual' &&
+     mc.program === r2.code && mc.programEpoch === p2.programEpoch);
 
   // ผู้เล่นต้องไม่เห็นคัตซีน (เห็นเฉพาะบนไลฟ์)
   B.inbox.length = 0;
@@ -715,6 +719,7 @@ async function testAutoBroadcast(port) {
 
   const p1 = await L.wait('program', 4000);
   ok('มีคนเปิดห้อง ระบบยกขึ้นภาพให้อัตโนมัติ', p1.code === r.code);
+  ok('สลับอัตโนมัติเริ่มรุ่นกระดานใหม่', Number.isInteger(p1.programEpoch));
   const s1 = await L.wait('state', 3000);
   ok('หน้าออกอากาศได้รับสถานะห้องนั้นด้วย', s1.code === r.code);
 
@@ -739,9 +744,11 @@ async function testAutoBroadcast(port) {
   C.send({ t:'ready' }); E.send({ t:'ready' });
   await C.waitState(s => s.state === 'playing');
   const toSecond = await L.waitWhere('program', m => m.code === r2.code, 3000);
-  ok('โหมดอัตโนมัติหมุนไปห้องถัดไปหลังครบช่วงเวลา', toSecond.code === r2.code);
+  ok('โหมดอัตโนมัติหมุนไปห้องถัดไปหลังครบช่วงเวลา',
+     toSecond.code === r2.code && toSecond.programEpoch > p1.programEpoch);
   const backToFirst = await L.waitWhere('program', m => m.code === r.code, 3000);
-  ok('โหมดอัตโนมัติหมุนกลับห้องแรกในรอบถัดไป', backToFirst.code === r.code);
+  ok('โหมดอัตโนมัติหมุนกลับห้องแรกในรอบถัดไป',
+     backToFirst.code === r.code && backToFirst.programEpoch > toSecond.programEpoch);
 
   // เกมที่กำลังออกอากาศจบลง ต้องค้างผลไว้ก่อน ไม่สลับทันที
   A.send({ t:'resign' });

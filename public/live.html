@@ -263,6 +263,7 @@ const AUTO = P.get('auto') === '1' || P.get('auto') === 'true';
 
 // ประกาศไว้ตั้งแต่ต้น เพราะ applyLang() ด้านล่างอ้างถึง view
 let view = null, program = null, clockBase = null, localGame = null;
+let liveProgramEpoch = 0;
 const I = window.I18N || { T:(k)=>k, SPEECH_LANG:{th:'th-TH',en:'en-US',ja:'ja-JP'}, rankLabel:()=> '—' };
 let LANG = ['th','en','ja'].includes(P.get('lang')) ? P.get('lang') : 'th';
 const T = (k, v) => I.T(k, v, LANG);
@@ -717,7 +718,19 @@ function connect(){
     const m = JSON.parse(e.data);
     if (m.t === 'program'){
       const changed = m.code !== program;
+      const nextEpoch = Number.isFinite(Number(m.programEpoch))
+        ? Number(m.programEpoch)
+        : liveProgramEpoch + (changed ? 1 : 0);
+      const epochChanged = nextEpoch !== liveProgramEpoch;
+      if (changed || epochChanged) {
+        // หยุดเสียง/คิวของกระดานเก่าทันที ก่อนรับคำพากย์ของกระดานใหม่
+        stopMCVoice();
+        stopCustomCutscene();
+        lastMCText = '';
+        lastMCLang = LANG;
+      }
       program = m.code;
+      liveProgramEpoch = nextEpoch;
       $('idle').classList.toggle('hidden', !!program);
       if (!program || changed) $('resultCard').classList.add('hidden');
       if (!program) { view = null; clockBase = null; updateBGM(true); }
@@ -729,6 +742,8 @@ function connect(){
     if (m.t === 'custom_cutscene') playCustomCutscene(m);
     if (m.t === 'mc'){
       if (!mcAutoEnabled) return;
+      if (m.programEpoch !== undefined && Number(m.programEpoch) !== liveProgramEpoch) return;
+      if (m.program !== undefined && m.program !== program) return;
       lastMCText = String(m.text || '');
       lastMCLang = m.lang || LANG;
       setMC(m.text);
@@ -981,18 +996,44 @@ function playCutscene(m){
 }
 
 let customCutBusy = false;
+let customCutAudio = null;
+let customCutTimer = null;
+
+function stopCustomCutscene(){
+  clearTimeout(customCutTimer);
+  customCutTimer = null;
+  if (customCutAudio) {
+    try { customCutAudio.pause(); customCutAudio.currentTime = 0; } catch {}
+    customCutAudio = null;
+  }
+  customCutBusy = false;
+  $('customCut').classList.remove('on');
+}
+
 function playCustomCutscene(m){
   if (customCutBusy || !m.imageUrl) return;
   customCutBusy = true;
   $('customCutImage').src = m.imageUrl;
   if (m.audioUrl) {
     const audio = new Audio(m.audioUrl);
+    customCutAudio = audio;
     audio.volume = .85;
+    audio.onended = () => {
+      if (customCutAudio === audio) customCutAudio = null;
+    };
     audio.play().catch(() => {});
   }
   const el = $('customCut');
   el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
-  setTimeout(() => { customCutBusy = false; el.classList.remove('on'); }, 5000);
+  customCutTimer = setTimeout(() => {
+    customCutTimer = null;
+    if (customCutAudio) {
+      try { customCutAudio.pause(); customCutAudio.currentTime = 0; } catch {}
+      customCutAudio = null;
+    }
+    customCutBusy = false;
+    el.classList.remove('on');
+  }, 5000);
 }
 
 /* ── นาฬิกา ── */
