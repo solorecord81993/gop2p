@@ -6,7 +6,10 @@ const fs = require('fs');
 const path = require('path');
 const { DICT, LANGS, T, rankLabel } = require('./i18n.js');
 const { GoGame } = require('./go-engine.js');
-const { CANNED, contextFromRoom, cannedForContext } = require('./mc.js');
+const {
+  CANNED, contextFromRoom, cannedForContext, GO_COMMENTARY_GUARDRAILS,
+  isWrongGameCommentary, systemPrompt,
+} = require('./mc.js');
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {
@@ -71,6 +74,19 @@ ok('คำพากย์ตอนเงียบมีให้เลือก�
    LANGS.every(L => CANNED[L].idle.length >= 4));
 ok('คำพากย์ตอนสลับกระดานมีหลายรูปแบบต่อภาษา',
    LANGS.every(L => CANNED[L].start.length >= 8));
+const allCannedText = LANGS.flatMap(L => Object.values(CANNED[L]).flat()).join(' ');
+ok('คำพากย์สำเร็จรูปใช้คำของเกม Go ไม่หลุดไปกีฬาชนิดอื่น',
+   !isWrongGameCommentary(allCannedText));
+ok('แก้คำพิมพ์ผิดเรื่องกลุ่มหมากถูกจับกินแล้ว',
+   !allCannedText.includes('หมู่นี้ถูกจับกิน') && allCannedText.includes('กลุ่มนี้ถูกจับกิน'));
+const prompt = systemPrompt('th', 'start');
+ok('prompt ของ AI ย้ำว่าเป็น Go และห้ามพูดถึงกอล์ฟ',
+   GO_COMMENTARY_GUARDRAILS.length >= 4 &&
+   prompt.includes('board game Go') && prompt.includes('Never mention golf'));
+ok('ระบบกรองคำบรรยายที่หลุดไปเป็นกีฬาชนิดอื่น',
+   isWrongGameCommentary('การแข่งขันกอล์ฟกำลังเริ่มขึ้น') &&
+   isWrongGameCommentary('This golfer is ready to swing') &&
+   !isWrongGameCommentary('ผู้เล่นหมากล้อมกำลังวางหมากบนกระดาน'));
 
 const mcGame = new GoGame({ size: 9, komi: 1.5 });
 const mcContext = contextFromRoom({
