@@ -93,6 +93,12 @@ for (const file of PAGES) {
     ok('คิว MC เลือก event ล่าสุดที่สำคัญกว่า idle',
        script.includes('VOICE_PRIORITY') && script.includes('queueLatestVoice') &&
        script.includes("kind || 'idle'"));
+    ok('สลับกระดานแล้วหยุดเสียงและล้างคิวทันที',
+       script.includes('stopMCVoice();') && script.includes('pendingVoice = null') &&
+       script.includes('liveProgramEpoch') && script.includes('stopCustomCutscene()'));
+    ok('ไม่รับคำพากย์จากกระดานเก่าหลังสลับ',
+       script.includes('m.programEpoch') && script.includes('m.program !== program') &&
+       script.includes('epochChanged'));
     ok('เพลงมีระบบ resume และกู้คืนเมื่อหน้า Live กลับมาแสดง',
        script.includes('Snd.resume()') && script.includes('Snd.ensureBGM()') &&
        script.includes('source.loop = true') && script.includes('voiceEndTimer'));

@@ -410,6 +410,7 @@ function pushState(room) { broadcast(room, { t: 'state', ...publicState(room) })
 const mc = new MCEngine();
 let mcAuto = true;
 let mcEpoch = 0;                    // ยกเลิกคำพากย์ที่ยังรอ AI เมื่อปิด MC
+let mcProgramEpoch = 0;              // รุ่นของกระดาน ป้องกันคำพากย์จากห้องเก่าหลุดมา
 let lastCutscene = -1;
 
 function autoCutscene(kind) {
@@ -426,7 +427,9 @@ async function mcSpeak(kind = 'idle', extra = {}, force = false) {
   if (!mcAuto || liveViewers.size === 0) return false;
   if (!mc.ready(Date.now(), force)) return false;
   const epoch = mcEpoch;
-  const room = programRoom && rooms.get(programRoom);
+  const programCode = programRoom;
+  const programEpoch = mcProgramEpoch;
+  const room = programCode && rooms.get(programCode);
   const ctx = room
     ? contextFromRoom(room, {
         blackRank: seatRankLabel(room.seats[BLACK]),
@@ -438,8 +441,12 @@ async function mcSpeak(kind = 'idle', extra = {}, force = false) {
   try {
     const r = await mc.say(ctx, kind);
     // ผู้กำกับอาจปิด MC ระหว่างที่รอ Groq/OpenRouter ตอบกลับ
-    if (!mcAuto || epoch !== mcEpoch) return false;
-    for (const v of liveViewers) send(v, { t: 'mc', text: r.text, lang: r.lang, source: r.source, kind });
+    // หรือสลับกระดานระหว่างที่ AI กำลังสร้างประโยคอยู่
+    if (!mcAuto || epoch !== mcEpoch || programCode !== programRoom || programEpoch !== mcProgramEpoch) return false;
+    for (const v of liveViewers) send(v, {
+      t: 'mc', text: r.text, lang: r.lang, source: r.source, kind,
+      program: programCode, programEpoch,
+    });
     autoCutscene(kind);
     return true;
   } catch (e) {
@@ -456,9 +463,13 @@ function broadcastManifest() {
 
 // ตั้งห้องที่ออกอากาศ ส่ง null = จอดำ
 function setProgram(code, transition = 'ink') {
+  if (programRoom !== code) mcProgramEpoch++;
   programRoom = code;
-  for (const d of directors)   send(d, { t: 'program', code: programRoom, auto: autoProgram });
-  for (const v of liveViewers) send(v, { t: 'program', code: programRoom, transition, auto: autoProgram });
+  for (const d of directors)   send(d, { t: 'program', code: programRoom, auto: autoProgram, programEpoch: mcProgramEpoch });
+  for (const v of liveViewers) send(v, {
+    t: 'program', code: programRoom, transition, auto: autoProgram,
+    programEpoch: mcProgramEpoch,
+  });
   const room = code && rooms.get(code);
   if (room) {
     for (const v of liveViewers) send(v, { t: 'state', ...publicState(room) });
@@ -1253,7 +1264,7 @@ async function handle(ws, m) {
         autoPickRoom();
       }
       if (m.lang) mc.setLang(m.lang);
-      send(ws, { t: 'program', code: programRoom, auto: autoProgram });
+      send(ws, { t: 'program', code: programRoom, auto: autoProgram, programEpoch: mcProgramEpoch });
       send(ws, { t: 'mc_info', lang: mc.lang, auto: mcAuto, hasAI: mc.hasAI });
       const room = programRoom && rooms.get(programRoom);
       if (room) send(ws, { t: 'state', ...publicState(room) });
@@ -1301,7 +1312,10 @@ async function handle(ws, m) {
 
     case 'mc': {
       if (!directors.has(ws)) return sendErr(ws, 'no_permission');
-      const payload = { t: 'mc', text: String(m.text || '').slice(0, 200), kind: 'manual' };
+      const payload = {
+        t: 'mc', text: String(m.text || '').slice(0, 200), kind: 'manual',
+        program: programRoom, programEpoch: mcProgramEpoch,
+      };
       for (const v of liveViewers) send(v, payload);
       return;
     }
