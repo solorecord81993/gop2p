@@ -29,7 +29,7 @@
 | `test-page.js` | **เปิดหน้าเว็บจริงด้วย jsdom** 22 ข้อ — จับสคริปต์พังตอนโหลด |
 | `test-neural.js` | ทดสอบ KataGo adapter, fallback และ neural ทั้ง User vs AI / AI vs AI 10 ข้อ |
 | `test-deploy.js` | ตรวจ Docker, checksum, Render Blueprint และ local KataGo environment 7 ข้อ |
-| `test-server.js` | ทดสอบเซิร์ฟเวอร์ครบวงจร 120 ข้อ |
+| `test-server.js` | ทดสอบเซิร์ฟเวอร์ครบวงจร 124 ข้อ |
 
 ---
 
@@ -87,6 +87,8 @@ npm start       # เปิด http://localhost:3000
    | `DIRECTOR_TOKEN` | รหัสลับที่ตั้งเอง สำหรับเข้าห้องคอนโทรล |
    | `AI_DELAY_MS` | `600` (หน่วงให้ AI ดูเหมือนกำลังคิด) |
    | `AI_RESULT_HOLD_MS` | `60000` (ค้างสรุปผลเกม AI ปะทะ AI 1 นาทีก่อนปิดห้อง) |
+   | `AUTO_DWELL_MS` | `60000` (โหมดอัตโนมัติค้างเกมที่ยังเล่นอยู่ 1 นาทีก่อนสลับ) |
+   | `AUTO_FINISHED_HOLD_MS` | `10000` (เกมจบแล้วค้างผล 10 วินาทีก่อนสลับ) |
    | `KATAGO_MAX_VISITS` | `32` สำหรับ CPU ของแผน Free (ยิ่งสูงยิ่งแข็งและช้าลง) |
    | `KATAGO_ROOT_SYMMETRIES` | `1` เพื่อลดเวลาคิดบน CPU ของแผน Free |
    | `KATAGO_TIMEOUT_MS` | `120000` ให้เวลาสูงสุด 2 นาทีสำหรับ neural inference |
@@ -252,7 +254,7 @@ node test-ui.js       49 ข้อ  — id ครบ, ปุ่มผูกค�
 node test-page.js     26 ข้อ  — เปิดหน้าจริงด้วย jsdom: ไม่มีข้อผิดพลาดตอนโหลด,
                                  ข้อความถูกเติมครบ, สลับภาษาได้จริง
 node test-neural.js   10 ข้อ  — KataGo protocol, HTTPS adapter, fallback, User vs AI และ AI vs AI
-node test-server.js  120 ข้อ  — นาฬิกา, เล่นจนจบ, โคะ, ฆ่าตัวตาย, ผู้ชม, หลุดแล้วกลับเข้า,
+node test-server.js  124 ข้อ  — นาฬิกา, เล่นจนจบ, โคะ, ฆ่าตัวตาย, ผู้ชม, หลุดแล้วกลับเข้า,
                                  หมดเวลา, AI, ห้องคอนโทรล, ไฟล์เว็บ,
                                  ภาพออกอากาศ (สลับห้อง จอดำ คัตซีน MC และสิทธิ์),
                                  โหมดถ่ายทอดอัตโนมัติด้วยมือถือ, MC พากย์สามภาษา,

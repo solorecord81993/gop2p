@@ -105,6 +105,11 @@ for (const file of PAGES) {
     ok('หน้าคอนโทรลแยกสถานะ Neural / Thinking / Fallback ชัดเจน',
        declared.has('neuralState') && script.includes('aiNeuralTag') &&
        script.includes('aiThinkingTag') && script.includes('aiFallbackTag'));
+    ok('อัปเดตสถานะโดยไม่ล้างและสร้าง grid ใหม่ทุกครั้ง',
+       script.includes('tileRefs') && script.includes('replaceChildren') &&
+       !script.includes("const g = $('grid'); g.innerHTML = ''"));
+    ok('ไม่ส่งคำสั่ง watch ซ้ำทุกครั้งที่ poll',
+       script.includes('watchedCodesKey') && script.includes('if (key === watchedCodesKey) return'));
   }
 
   // ---- 5d. หน้าเว็บต้องโหลดไฟล์เสียงที่อัปโหลดไว้ ----

@@ -207,7 +207,8 @@ const rooms = new Map();          // code -> room
 let programRoom = null;           // ห้องที่กำลังออกอากาศ
 let autoProgram = false;          // สลับห้องอัตโนมัติ (ใช้ตอนไม่มีคนคุมหน้าเบื้องหลัง)
 let lastAutoSwitch = 0;
-const AUTO_DWELL_MS = Number(process.env.AUTO_DWELL_MS ?? 30_000);   // ค้างห้องละอย่างน้อย 30 วินาที
+const AUTO_DWELL_MS = Number(process.env.AUTO_DWELL_MS ?? 60_000);   // ห้องที่ยังเล่นอยู่ค้างภาพ 1 นาที
+const AUTO_FINISHED_HOLD_MS = Number(process.env.AUTO_FINISHED_HOLD_MS ?? 10_000);
 
 function makeCode() {
   let c;
@@ -278,6 +279,7 @@ function createRoom(opts) {
     recentCaptures: [],
     mode: opts.mode === 'ai_vs_ai' ? 'ai_vs_ai' : (opts.vsAI ? 'human_vs_ai' : 'human'),
     score: null,
+    finishedAt: null,
     autoCloseAt: null,
     closeTimer: null,
     aiThinking: null,
@@ -486,6 +488,7 @@ function endGame(room, result, extra = {}) {
   room.game.state = 'finished';
   room.game.result = result;
   room.score = extra.score || result.score || null;
+  room.finishedAt = Date.now();
   room.turnStartedAt = null;
   if (room.mode === 'ai_vs_ai') {
     room.autoCloseAt = Date.now() + AI_RESULT_HOLD_MS;
@@ -679,30 +682,55 @@ async function saveGame(room, result) {
 }
 
 /* ---------- เลือกห้องขึ้นออกอากาศเอง เมื่อไม่มีผู้กำกับคุม ---------- */
+function nextRoomInOrder(list, currentCode) {
+  if (!list.length) return null;
+  const currentIndex = list.findIndex(room => room.code === currentCode);
+  const start = currentIndex >= 0 ? currentIndex : -1;
+  for (let offset = 1; offset <= list.length; offset++) {
+    const room = list[(start + offset) % list.length];
+    if (room.code !== currentCode) return room;
+  }
+  return null;
+}
+
 function autoPickRoom() {
   if (!autoProgram) return;
   const now = Date.now();
   const cur = programRoom && rooms.get(programRoom);
 
-  // เกม AI ปะทะ AI ต้องค้างสรุปผลบนภาพออกอากาศครบหนึ่งนาที
-  if (cur?.mode === 'ai_vs_ai' && cur.state === 'finished' && now < cur.autoCloseAt) return;
-
-  // ห้องปัจจุบันยังเล่นอยู่และยังไม่ครบเวลาค้าง -> ไม่ต้องสลับ
-  if (cur && cur.state !== 'finished' && now - lastAutoSwitch < AUTO_DWELL_MS) return;
+  if (cur?.state === 'finished') {
+    // เกมจบแล้วให้ผู้ชมเห็นผลบนจอ 10 วินาที แล้วจึงเปลี่ยนห้อง
+    const finishedAt = cur.finishedAt || lastAutoSwitch;
+    if (now - finishedAt < AUTO_FINISHED_HOLD_MS) return;
+  } else if (cur && now - lastAutoSwitch < AUTO_DWELL_MS) {
+    // เกมที่ยังเล่นอยู่ค้างภาพอย่างน้อย 1 นาที
+    return;
+  }
 
   const all = [...rooms.values()];
-  const playing = all.filter(r => r.state === 'playing');
-  const waiting = all.filter(r => r.state === 'waiting' || r.state === 'ready' || r.state === 'marking');
+  const playing = all.filter(room => room.state === 'playing');
+  const waiting = all.filter(room =>
+    room.state === 'waiting' || room.state === 'ready' || room.state === 'marking');
 
-  let pick = null;
-  if (playing.length) pick = playing.reduce((a, b) => (b.heat > a.heat ? b : a));
-  else if (waiting.length) pick = waiting[0];
+  let pool;
+  if (!cur || cur.state === 'finished') {
+    pool = playing.length ? playing : waiting;
+  } else {
+    // ให้ห้องที่กำลังเล่นมีความสำคัญก่อน แต่ถ้าไม่มีห้องเล่นอื่นแล้ว
+    // ให้หมุนไปห้องรอ/ห้องกำลังสรุปแทน เพื่อไม่ค้างภาพเดิมตลอด
+    const otherPlaying = playing.some(room => room.code !== cur.code);
+    pool = otherPlaying ? playing : waiting.filter(room => room.code !== cur.code);
+  }
 
-  // ห้องที่เพิ่งจบ ค้างภาพจอผลไว้อีก 8 วินาทีก่อนสลับ
-  if (cur && cur.state === 'finished' && now - lastAutoSwitch < AUTO_DWELL_MS + 8000 && pick && pick.code !== cur.code) return;
-
-  if (!pick) { if (programRoom) { lastAutoSwitch = now; setProgram(null, 'fade'); } return; }
-  if (pick.code === programRoom) return;
+  const pick = nextRoomInOrder(pool, cur?.code);
+  if (!pick) {
+    // ไม่มีห้องอื่นให้หมุนไป ถ้าห้องปัจจุบันจบแล้วจึงค่อยตัดเป็นจอดำ
+    if (cur?.state === 'finished' && programRoom) {
+      lastAutoSwitch = now;
+      setProgram(null, 'fade');
+    }
+    return;
+  }
   lastAutoSwitch = now;
   setProgram(pick.code, 'ink');
 }
@@ -1150,7 +1178,11 @@ async function handle(ws, m) {
     case 'live': {
       liveViewers.add(ws);
       // โหมดอัตโนมัติ: ใช้ตอนถ่ายทอดด้วยมือถือเครื่องเดียว ไม่มีคนคุมหน้าเบื้องหลัง
-      if (m.auto) { autoProgram = true; autoPickRoom(); }
+      if (m.auto && !autoProgram) {
+        autoProgram = true;
+        lastAutoSwitch = programRoom ? Date.now() : 0;
+        autoPickRoom();
+      }
       if (m.lang) mc.setLang(m.lang);
       send(ws, { t: 'program', code: programRoom, auto: autoProgram });
       send(ws, { t: 'mc_info', lang: mc.lang, auto: mcAuto, hasAI: mc.hasAI });
@@ -1223,7 +1255,9 @@ async function handle(ws, m) {
     case 'auto': {
       if (!directors.has(ws)) return sendErr(ws, 'no_permission');
       autoProgram = m.value !== false;
-      lastAutoSwitch = 0;
+      // ถ้ามีภาพอยู่แล้ว ให้เริ่มนับหนึ่งนาทีจากภาพปัจจุบัน;
+      // ถ้ายังไม่มีภาพ ให้เลือกห้องแรกขึ้นมาทันที
+      lastAutoSwitch = autoProgram && programRoom ? Date.now() : 0;
       autoPickRoom();
       for (const d of directors) send(d, { t: 'auto', value: autoProgram });
       return;

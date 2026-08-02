@@ -305,15 +305,20 @@ function applyLang(){
   $('btnClosePreview').title = T('dir.forceClose');
   if (!program) $('pgTitle').textContent = T('dir.noRoom');
   if (!preview) $('pvTitle').textContent = T('dir.notPicked');
+  scheduleRender();
 }
 
 const WS_URL = location.origin.replace(/^http/, 'ws');
-const DWELL_MS = 30000;
 
 let ws = null, token = '', rooms = [], program = null, preview = null;
 let SET = null;   // การตั้งค่าที่โหลดมาจากเซิร์ฟเวอร์ (ต้องประกาศก่อน applyLang เรียกใช้)
 let states = new Map();          // code -> state ของห้องนั้น (มาจาก WS เฉพาะห้องที่ออกอากาศ)
-let lastSwitchAt = 0;
+let pollTimer = null;
+let reconnectTimer = null;
+let watchedCodesKey = '';
+let gridKey = '';
+const tileRefs = new Map();
+let renderScheduled = false;
 
 $('btnEnter').onclick = () => {
   token = $('tok').value.trim();
@@ -326,6 +331,7 @@ $('uiLang').value = LANG;
 applyLang();
 
 function connect(){
+  if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) return;
   ws = new WebSocket(WS_URL);
   ws.onopen = () => {
     ws.send(JSON.stringify({ t:'auth', name:'director' }));
@@ -338,7 +344,9 @@ function connect(){
       program = m.program;
       if (Array.isArray(m.aiLevels) && m.aiLevels.length) aiLevels = m.aiLevels;
       if (m.neural) neuralStatus = m.neural;
-      applyLang(); poll(); setInterval(poll, 2000);
+      watchedCodesKey = '';
+      applyLang(); poll();
+      if (!pollTimer) pollTimer = setInterval(poll, 2000);
       ws.send(JSON.stringify({ t:'auto', value:false }));   // เปิดหน้านี้ = คุมเอง
     }
     if (m.t === 'error'){
@@ -350,11 +358,11 @@ function connect(){
         $('aiStartState').textContent = message;
       }
     }
-    if (m.t === 'program'){ program = m.code; lastSwitchAt = Date.now(); render(); }
+    if (m.t === 'program'){ program = m.code || null; scheduleRender(); }
     if (m.t === 'auto'){ $('autoMode').checked = !!m.value; }
     if (m.t === 'mc_lang'){ $('mcLang').value = m.lang; }
     if (m.t === 'mc_auto'){ $('mcAuto').checked = !!m.value; }
-    if (m.t === 'state' || m.t === 'end'){ states.set(m.code, m); render(); }
+    if (m.t === 'state' || m.t === 'end'){ states.set(m.code, m); scheduleRender(); }
     if (m.t === 'ai_game_created'){
       $('btnStartAI').disabled = false;
       $('btnStartAI').textContent = T('dir.aiStart');
@@ -370,24 +378,38 @@ function connect(){
       poll();
     }
   };
-  ws.onclose = () => setTimeout(connect, 2000);
+  ws.onclose = () => {
+    watchedCodesKey = '';
+    if (!reconnectTimer) reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connect();
+    }, 2000);
+  };
 }
 
 async function poll(){
   try {
     const r = await fetch('/api/rooms').then(r => r.json());
-    rooms = r.rooms; program = r.program;
+    rooms = Array.isArray(r.rooms) ? r.rooms : [];
+    program = r.program || null;
+    const active = new Set(rooms.map(room => room.code));
+    for (const code of states.keys()) if (!active.has(code)) states.delete(code);
+    if (preview && !active.has(preview)) preview = null;
     $('nRooms').textContent = rooms.length;
     $('clock').textContent = new Date().toLocaleTimeString(LANG === 'ja' ? 'ja-JP' : LANG === 'en' ? 'en-US' : 'th-TH');
     syncWatch();
-    render();
+    scheduleRender();
   } catch {}
 }
 
 // ขอรับภาพสดของทุกห้องที่เปิดอยู่ (ผู้กำกับดูได้หลายห้องพร้อมกัน ไม่นั่งเป็นผู้เล่น)
 function syncWatch(){
   if (!ws || ws.readyState !== 1) return;
-  ws.send(JSON.stringify({ t:'watch', codes: rooms.map(r => r.code) }));
+  const codes = rooms.map(r => r.code);
+  const key = codes.join('|');
+  if (key === watchedCodesKey) return;
+  watchedCodesKey = key;
+  ws.send(JSON.stringify({ t:'watch', codes }));
 }
 
 /* โหมดสลับอัตโนมัติทำงานที่เซิร์ฟเวอร์ ไม่ใช่ที่หน้านี้
@@ -405,7 +427,6 @@ $('mcLang').onchange   = () => {
 
 function take(code){
   ws.send(JSON.stringify({ t:'program', code }));
-  lastSwitchAt = Date.now();
   syncWatch();
 }
 $('btnTake').onclick = () => { if (preview) take(preview); };
@@ -420,7 +441,7 @@ $('btnClosePreview').onclick = () => forceClose(preview);
 $('btnBlack').onclick = () => {
   if (!confirm(T('dir.blackConfirm'))) return;
   ws.send(JSON.stringify({ t:'program', code:null }));
-  program = null; lastSwitchAt = Date.now(); $('autoMode').checked = false; render();
+  program = null; $('autoMode').checked = false; scheduleRender();
 };
 
 $('btnStartAI').onclick = () => {
@@ -608,37 +629,95 @@ $('btnCut').onclick = () => {
   ws.send(JSON.stringify({ t:'highlight', nameTh, nameJa, tier, coords }));
 };
 
-function render(){
-  const g = $('grid'); g.innerHTML = '';
-  for (const r of rooms){
-    const el = document.createElement('div');
-    el.className = 'tile' + (r.code === preview ? ' sel' : '') + (r.code === program ? ' live' : '');
-    el.innerHTML = `
-      <button class="tile-close" type="button" title="${T('dir.forceClose')}" aria-label="${T('dir.forceClose')}">×</button>
-      <canvas width="200" height="200"></canvas>
-      <div class="meta">
-        <span><b>${r.code}</b> ${r.code === program ? '<span class="badge">LIVE</span>' : ''}</span>
-        <span>${r.size}×${r.size}</span>
-      </div>
-      <div class="meta">
-        <span class="players-line">${roomPlayersHtml(r)}</span><span>${T('dir.moves', { n:r.moves })}</span>
-      </div>
-      <div class="heat"><i style="width:${Math.max(3, r.heat)}%"></i></div>`;
-    el.onclick = () => {
-      preview = r.code;
-      $('btnTake').disabled = false;
-      syncWatch();
-      render();
-    };
-    el.querySelector('.tile-close').onclick = e => {
-      e.stopPropagation();
-      forceClose(r.code);
-    };
-    g.appendChild(el);
-    drawMini(el.querySelector('canvas'), states.get(r.code), r.size);
+function scheduleRender(){
+  if (renderScheduled) return;
+  renderScheduled = true;
+  const paint = () => {
+    renderScheduled = false;
+    render();
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(paint);
+  else setTimeout(paint, 0);
+}
+
+function createTileRef(room){
+  const el = document.createElement('div');
+  el.innerHTML = `
+    <button class="tile-close" type="button" title="${T('dir.forceClose')}" aria-label="${T('dir.forceClose')}">×</button>
+    <canvas width="200" height="200"></canvas>
+    <div class="meta">
+      <span data-room-label></span>
+      <span data-room-size></span>
+    </div>
+    <div class="meta">
+      <span class="players-line" data-room-players></span><span data-room-moves></span>
+    </div>
+    <div class="heat"><i data-room-heat></i></div>`;
+  const ref = {
+    el,
+    canvas: el.querySelector('canvas'),
+    close: el.querySelector('.tile-close'),
+    label: el.querySelector('[data-room-label]'),
+    size: el.querySelector('[data-room-size]'),
+    players: el.querySelector('[data-room-players]'),
+    moves: el.querySelector('[data-room-moves]'),
+    heat: el.querySelector('[data-room-heat]'),
+  };
+  el.onclick = () => {
+    preview = room.code;
+    syncWatch();
+    scheduleRender();
+  };
+  ref.close.onclick = e => {
+    e.stopPropagation();
+    forceClose(room.code);
+  };
+  return ref;
+}
+
+function updateTileRef(room, ref){
+  ref.el.className = 'tile' + (room.code === preview ? ' sel' : '')
+    + (room.code === program ? ' live' : '');
+  ref.close.title = T('dir.forceClose');
+  ref.close.setAttribute('aria-label', T('dir.forceClose'));
+  ref.label.replaceChildren(document.createTextNode(room.code));
+  if (room.code === program){
+    const badge = document.createElement('span');
+    badge.className = 'badge';
+    badge.textContent = 'LIVE';
+    ref.label.append(' ', badge);
   }
+  ref.size.textContent = `${room.size}×${room.size}`;
+  ref.players.innerHTML = roomPlayersHtml(room);
+  ref.moves.textContent = T('dir.moves', { n:room.moves });
+  ref.heat.style.width = `${Math.max(3, room.heat || 0)}%`;
+  drawMini(ref.canvas, states.get(room.code), room.size);
+}
+
+function renderGrid(){
+  const g = $('grid');
+  const nextKey = rooms.map(room => `${room.code}:${room.size}`).join('|');
+  if (nextKey !== gridKey || tileRefs.size !== rooms.length){
+    g.replaceChildren();
+    tileRefs.clear();
+    for (const room of rooms){
+      const ref = createTileRef(room);
+      tileRefs.set(room.code, ref);
+      g.appendChild(ref.el);
+    }
+    gridKey = nextKey;
+  }
+  for (const room of rooms){
+    const ref = tileRefs.get(room.code);
+    if (ref) updateTileRef(room, ref);
+  }
+}
+
+function render(){
+  renderGrid();
   paintDeck('cvProgram', 'pg', program);
   paintDeck('cvPreview', 'pv', preview);
+  $('btnTake').disabled = !preview;
   $('btnCloseProgram').classList.toggle('hidden', !program);
   $('btnClosePreview').classList.toggle('hidden', !preview);
 }

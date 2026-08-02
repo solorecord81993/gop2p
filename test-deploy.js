@@ -54,6 +54,8 @@ ok('Render ใช้ Docker Free และค้างผล AI หนึ่ง�
    /plan:\s*free/.test(render) &&
    /dockerfilePath:\s*\.\/Dockerfile/.test(render) &&
    /key:\s*AI_RESULT_HOLD_MS\s*\n\s*value:\s*"60000"/.test(render) &&
+   /key:\s*AUTO_DWELL_MS\s*\n\s*value:\s*"60000"/.test(render) &&
+   /key:\s*AUTO_FINISHED_HOLD_MS\s*\n\s*value:\s*"10000"/.test(render) &&
    /key:\s*KATAGO_MAX_VISITS\s*\n\s*value:\s*"32"/.test(render) &&
    /key:\s*KATAGO_ROOT_SYMMETRIES\s*\n\s*value:\s*"1"/.test(render) &&
    /key:\s*KATAGO_TIMEOUT_MS\s*\n\s*value:\s*"120000"/.test(render));
