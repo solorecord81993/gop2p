@@ -368,6 +368,7 @@ function pushState(room) { broadcast(room, { t: 'state', ...publicState(room) })
  * ===================================================================== */
 const mc = new MCEngine();
 let mcAuto = true;
+let mcEpoch = 0;                    // ยกเลิกคำพากย์ที่ยังรอ AI เมื่อปิด MC
 let lastCutscene = -1;
 
 function autoCutscene(kind) {
@@ -381,8 +382,9 @@ function autoCutscene(kind) {
 }
 
 async function mcSpeak(kind = 'idle', extra = {}, force = false) {
-  if (!mcAuto || liveViewers.size === 0) return;
-  if (!mc.ready(Date.now(), force)) return;
+  if (!mcAuto || liveViewers.size === 0) return false;
+  if (!mc.ready(Date.now(), force)) return false;
+  const epoch = mcEpoch;
   const room = programRoom && rooms.get(programRoom);
   const ctx = room
     ? contextFromRoom(room, {
@@ -394,10 +396,14 @@ async function mcSpeak(kind = 'idle', extra = {}, force = false) {
         blackName: '—', whiteName: '—', blackRank: '—', whiteRank: '—', ...extra };
   try {
     const r = await mc.say(ctx, kind);
+    // ผู้กำกับอาจปิด MC ระหว่างที่รอ Groq/OpenRouter ตอบกลับ
+    if (!mcAuto || epoch !== mcEpoch) return false;
     for (const v of liveViewers) send(v, { t: 'mc', text: r.text, lang: r.lang, source: r.source, kind });
     autoCutscene(kind);
+    return true;
   } catch (e) {
     console.warn('[mc]', e.message);
+    return false;
   }
 }
 
@@ -1241,6 +1247,7 @@ async function handle(ws, m) {
       if (!directors.has(ws)) return sendErr(ws, 'no_permission');
       mc.setLang(m.lang);
       for (const d of directors) send(d, { t: 'mc_lang', lang: mc.lang });
+      for (const v of liveViewers) send(v, { t: 'mc_info', lang: mc.lang, auto: mcAuto, hasAI: mc.hasAI });
       mcSpeak('idle', {}, true);
       return;
     }
@@ -1248,7 +1255,18 @@ async function handle(ws, m) {
     case 'mc_auto': {
       if (!directors.has(ws)) return sendErr(ws, 'no_permission');
       mcAuto = m.value !== false;
+      mcEpoch++;
       for (const d of directors) send(d, { t: 'mc_auto', value: mcAuto, hasAI: mc.hasAI });
+      for (const v of liveViewers) {
+        send(v, { t: 'mc_info', lang: mc.lang, auto: mcAuto, hasAI: mc.hasAI });
+        if (!mcAuto) send(v, { t: 'mc_stop' });
+      }
+      // เปิดกลับมาแล้วให้มีประโยคใหม่ทันที ไม่ต้องรอรอบ idle ถัดไป
+      if (mcAuto) {
+        mcSpeak('idle', {}, true).then(spoken => {
+          if (!spoken && mcAuto) setTimeout(() => mcSpeak('idle', {}, true), MC_CFG.timeoutMs + 100);
+        });
+      }
       return;
     }
 

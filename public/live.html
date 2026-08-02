@@ -286,15 +286,16 @@ const Speech = (() => {
   }
   return {
     unlock(){
-      if (!supported) return;
+      if (!supported) return false;
       enabled = true; loadVoices();
       try {
         const u = new SpeechSynthesisUtterance(' ');
         u.volume = 0; speechSynthesis.speak(u);
-      } catch {}
+      } catch { return false; }
+      return true;
     },
     say(text, lang){
-      if (!enabled || !supported || !text) return;
+      if (!enabled || !supported || !text) return false;
       try {
         if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
@@ -302,7 +303,12 @@ const Speech = (() => {
         const v = pick(lang); if (v) u.voice = v;
         u.rate = 1.05;
         speechSynthesis.speak(u);
-      } catch (e) { console.warn('พูดไม่ได้', e); }
+        return true;
+      } catch (e) { console.warn('พูดไม่ได้', e); return false; }
+    },
+    stop(){
+      if (!supported) return;
+      try { speechSynthesis.cancel(); } catch {}
     },
     get supported(){ return supported; },
   };
@@ -355,10 +361,30 @@ fit();
 /* ── เสียงบนภาพออกอากาศ (iPhone ต้องมีการแตะก่อนถึงจะเล่นได้) ── */
 const Snd = (() => {
   let ctx = null, on = false;
-  function unlock(){
-    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if (ctx.state === 'suspended') ctx.resume();
+  let bgmSrc = null, bgmGain = null, bgmSlot = null, wantedBGM = null;
+  let ducked = false;
+  const buffers = new Map();
+
+  function init(){
+    if (ctx) return ctx;
+    const Audio = window.AudioContext || window.webkitAudioContext;
+    if (!Audio) return null;
+    ctx = new Audio();
+    return ctx;
+  }
+
+  async function resume(){
+    if (!ctx) return false;
+    try { if (ctx.state === 'suspended') await ctx.resume(); } catch {}
+    ensureBGM();
+    return ctx.state === 'running' || ctx.state === undefined;
+  }
+
+  async function unlock(){
+    if (!init()) return false;
     on = true;
+    await resume();
+    return true;
   }
   function blip(f, d, type='sine', v=.45){
     if (!ctx || !on) return;
@@ -377,16 +403,45 @@ const Snd = (() => {
     player_join:() => { blip(520,.1); setTimeout(()=>blip(720,.13),95); },
     cut:        () => { blip(880,.09,'square',.5); setTimeout(()=>blip(1320,.28,'square',.42),90); },
   };
-  // ไฟล์เสียงที่ผู้กำกับอัปโหลด
-  const buffers = new Map();
   const SLOT = { stone:'sfx_stone', capture:'sfx_capture', pass:'sfx_pass',
                  game_start:'sfx_start', game_end:'sfx_end', cut:'sfx_cut' };
-  let bgmSrc = null, bgmGain = null;
-  function stopBGM(){ if (bgmSrc){ try{ bgmSrc.stop(); }catch{} bgmSrc = null; } }
+
+  function stopBGM(clearWanted = true){
+    const old = bgmSrc;
+    bgmSrc = null; bgmGain = null; bgmSlot = null;
+    if (old) { try { old.stop(); } catch {} }
+    if (clearWanted) wantedBGM = null;
+  }
+
+  function startBGM(slot){
+    if (!on || !ctx || !buffers.has(slot)) return false;
+    if (bgmSrc && bgmSlot === slot) return true;
+    stopBGM(false);
+    const source = ctx.createBufferSource();
+    const gain = ctx.createGain();
+    source.buffer = buffers.get(slot);
+    source.loop = true;
+    gain.gain.value = ducked ? .08 : .28;
+    source.connect(gain); gain.connect(ctx.destination);
+    bgmSrc = source; bgmGain = gain; bgmSlot = slot;
+    source.onended = () => {
+      if (bgmSrc !== source) return;
+      bgmSrc = null; bgmGain = null; bgmSlot = null;
+      if (wantedBGM === slot && on) setTimeout(() => startBGM(slot), 0);
+    };
+    try { source.start(); } catch { stopBGM(false); return false; }
+    return true;
+  }
+
+  function ensureBGM(){
+    if (wantedBGM) startBGM(wantedBGM);
+  }
 
   return {
-    unlock, buffers,
+    unlock, resume, buffers,
     play(id){
+      if (!on) return;
+      resume();
       const slot = SLOT[id] || id;
       if (ctx && buffers.has(slot)){
         const s = ctx.createBufferSource(); s.buffer = buffers.get(slot);
@@ -397,26 +452,38 @@ const Snd = (() => {
       map[id] && map[id]();
     },
     async preload(list){
-      if (!ctx) return;
+      if (!init()) return;
       for (const { id, url } of list){
         try {
           const buf = await fetch(url).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b));
           buffers.set(id, buf);
         } catch (e) { console.warn('โหลดเสียงไม่สำเร็จ', id, e); }
       }
+      ensureBGM();
     },
     // เพลงประกอบต้องวนเสมอ ไม่มีทางเงียบเองตอนจบแทร็ก
-    playBGM(slot){
-      if (!ctx || !buffers.has(slot)) return;
-      stopBGM();
-      bgmSrc = ctx.createBufferSource(); bgmSrc.buffer = buffers.get(slot); bgmSrc.loop = true;
-      bgmGain = ctx.createGain(); bgmGain.gain.value = .28;
-      bgmSrc.connect(bgmGain); bgmGain.connect(ctx.destination); bgmSrc.start();
+    playBGM(slot, force = false){
+      wantedBGM = slot || null;
+      if (force && bgmSlot === slot) stopBGM(false);
+      return startBGM(slot);
     },
     stopBGM,
-    duck(on){ if (bgmGain) bgmGain.gain.value = on ? .08 : .28; },   // หรี่เพลงตอน MC พูด
+    ensureBGM,
+    has: id => buffers.has(SLOT[id] || id),
+    duck(value){
+      ducked = !!value;
+      if (bgmGain) bgmGain.gain.value = ducked ? .08 : .28;
+    },   // หรี่เพลงตอน MC พูด และคืนเสียงเมื่อหยุดพูด
+    get isOn(){ return on; },
   };
 })();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    Snd.resume();
+    Snd.ensureBGM();
+    updateBGM(false);
+  }
+});
 
 /* ── กันหน้าจอดับระหว่างถ่ายทอด ── */
 let wakeLock = null;
@@ -433,12 +500,43 @@ async function keepAwake(){
   } catch {}
 }
 
-$('btnBoot').onclick = () => {
-  Snd.unlock(); Speech.unlock(); keepAwake();
+$('btnBoot').onclick = async () => {
+  await Snd.unlock();
+  Speech.unlock();
+  keepAwake();
   $('boot').style.display = 'none';
   fit();
   fetch('/api/manifest').then(r => r.json()).then(applyManifest).catch(() => {});
 };
+
+/* ── ควบคุมเสียง MC แยกจากเพลง ──
+ * ปิด MC ต้องหยุด speech ที่กำลังค้างและคืนระดับเพลงทันที
+ * เปิด MC ใหม่ต้องไม่ถูกคำพูดเก่าหรือ timer เก่ากดทับ
+ */
+let mcAutoEnabled = true;
+let voiceSeq = 0;
+let voiceTimer = null;
+function stopMCVoice(){
+  voiceSeq++;
+  clearTimeout(voiceTimer);
+  voiceTimer = null;
+  Speech.stop();
+  Snd.duck(false);
+  Snd.ensureBGM();
+}
+function speakMC(text, lang){
+  const seq = ++voiceSeq;
+  clearTimeout(voiceTimer);
+  voiceTimer = null;
+  const spoken = Speech.say(text, lang);
+  if (!spoken) { Snd.duck(false); return; }
+  Snd.duck(true);
+  voiceTimer = setTimeout(() => {
+    if (seq !== voiceSeq) return;
+    Snd.duck(false);
+    Snd.ensureBGM();
+  }, Math.min(12000, 1400 + String(text || '').length * 90));
+}
 
 
 /* ── WebSocket ── */
@@ -465,14 +563,18 @@ function connect(){
     if (m.t === 'highlight') playCutscene(m);      // ค่ายกล — เห็นเฉพาะบนไลฟ์
     if (m.t === 'custom_cutscene') playCustomCutscene(m);
     if (m.t === 'mc'){
+      if (!mcAutoEnabled) return;
       setMC(m.text);
       if (!program) $('idleMcText').textContent = m.text;
-      Snd.duck(true); Speech.say(m.text, m.lang || LANG);
-      clearTimeout(window.__duck);
-      window.__duck = setTimeout(() => Snd.duck(false), Math.min(9000, 1200 + m.text.length * 90));
+      speakMC(m.text, m.lang || LANG);
     }
     if (m.t === 'manifest') applyManifest(m);
-    if (m.t === 'mc_info' && m.lang) LANG = m.lang;
+    if (m.t === 'mc_info'){
+      if (m.lang) LANG = m.lang;
+      mcAutoEnabled = m.auto !== false;
+      if (!mcAutoEnabled) stopMCVoice();
+    }
+    if (m.t === 'mc_stop') { mcAutoEnabled = false; stopMCVoice(); }
     if (m.t === 'sfx') Snd.play(m.id);
   };
   ws.onclose = () => setTimeout(connect, Math.min(6000, 700 * ++retry));
@@ -482,7 +584,7 @@ connect();
 let bgmNow = null;
 async function applyManifest(mf){
   const list = (mf.assets || []).filter(a => a.url).map(a => ({ id:a.id, url:a.url }));
-  if (!list.length) return;
+  if (!list.length) { bgmNow = null; updateBGM(true); return; }
   await Snd.preload(list);
   updateBGM(true);
 }
@@ -496,8 +598,9 @@ function updateBGM(force){
     if (c && c.main === 0) want = 'bgm_tense';
   }
   if (!Snd.buffers.has(want)) want = Snd.buffers.has('bgm_lobby') ? 'bgm_lobby' : null;
-  if (!want) return Snd.stopBGM();
-  if (want !== bgmNow || force){ bgmNow = want; Snd.playBGM(want); }
+  if (!want) { bgmNow = null; return Snd.stopBGM(); }
+  if (want !== bgmNow || force){ bgmNow = want; Snd.playBGM(want, force); }
+  else Snd.ensureBGM();
 }
 
 function playTransition(kind){

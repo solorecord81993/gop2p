@@ -217,7 +217,7 @@ th: {
 
   'mc.label': 'MC',
   'mc.waiting': 'รอเริ่มการถ่ายทอดสด…',
-  'mc.invite': 'สแกน QR เข้ามาสร้างเกม เล่นกับเพื่อนหรือ AI ได้เลยครับ! ถ้าชอบอย่าลืมกดไลก์ กด Live และส่งของขวัญให้กำลังใจผู้เล่นนะครับ',
+  'mc.invite': 'สแกน QR เข้ามาสร้างเกม เล่นกับเพื่อนหรือ AI ได้เลยครับ! ถ้าชอบอย่าลืมกดไลก์กดแชร์เป็นกำลังใจให้ผู้เล่นนะครับ',
   'mc.roomWaiting': 'ห้อง {code} กำลังรอคู่แข่งอยู่ครับ',
   'mc.ready': 'ผู้เล่นครบแล้ว กำลังจะเริ่มกันแล้วครับ',
   'mc.marking': 'จบเกมแล้ว กำลังตกลงหมากตายก่อนนับแต้มครับ',
@@ -525,7 +525,7 @@ en: {
 
   'mc.label': 'MC',
   'mc.waiting': 'Waiting for the broadcast to begin…',
-  'mc.invite': 'Scan the QR code to create a game and play with friends or AI! Tap like, go Live, and send a gift to cheer on our players.',
+  'mc.invite': 'Scan the QR code to create a game and play with friends or AI! Tap like and share to cheer on our players.',
   'mc.roomWaiting': 'Room {code} is still waiting for an opponent.',
   'mc.ready': 'Both players are here — we are about to begin.',
   'mc.marking': 'The game is over. They are agreeing on dead stones before counting.',
@@ -833,7 +833,7 @@ ja: {
 
   'mc.label': '実況',
   'mc.waiting': '配信の開始を待っています…',
-  'mc.invite': 'QRコードを読み取って、友達やAIと対局しましょう！いいね、Live、ギフトで対局者を応援してください。',
+  'mc.invite': 'QRコードを読み取って、友達やAIと対局しましょう！いいねとシェアで対局者を応援してください。',
   'mc.roomWaiting': '部屋 {code} はまだ対局者を待っています。',
   'mc.ready': '両者そろいました。まもなく開始です。',
   'mc.marking': '対局が終わり、死に石の確認をしています。',
