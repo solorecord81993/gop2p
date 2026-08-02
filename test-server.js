@@ -603,6 +603,8 @@ async function testWatchAndFiles(port) {
      (await logo.text()).includes('<svg'));
   const hz = await fetch(`http://127.0.0.1:${port}/healthz`).then(r => r.text());
   ok('มี /healthz สำหรับ Render ตรวจสุขภาพ', hz === 'ok');
+  const badTts = await fetch(`http://127.0.0.1:${port}/api/tts?lang=xx&text=test`);
+  ok('TTS proxy ปฏิเสธภาษา/คำขอที่ไม่ถูกต้อง', badTts.status === 400);
 
   A.close(); B.close(); D.close(); S.close();
 }

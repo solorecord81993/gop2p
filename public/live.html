@@ -376,8 +376,10 @@ fit();
 const Snd = (() => {
   let ctx = null, on = false;
   let bgmSrc = null, bgmGain = null, bgmSlot = null, wantedBGM = null;
+  let voiceSrc = null, voiceLoadId = 0;
   let ducked = false;
   const buffers = new Map();
+  const voiceBuffers = new Map();
 
   function init(){
     if (ctx) return ctx;
@@ -451,6 +453,51 @@ const Snd = (() => {
     if (wantedBGM) startBGM(wantedBGM);
   }
 
+  function stopVoice(){
+    voiceLoadId++;
+    const old = voiceSrc;
+    voiceSrc = null;
+    if (old) { try { old.stop(); } catch {} }
+  }
+
+  async function playVoice(text, lang, onended){
+    if (!on || !ctx || !text) return false;
+    const id = ++voiceLoadId;
+    const phrase = String(text).trim().slice(0, 180);
+    const key = `${lang || 'th'}:${phrase}`;
+    try {
+      let buffer = voiceBuffers.get(key);
+      if (!buffer) {
+        const query = new URLSearchParams({ lang: lang || 'th', text: phrase });
+        const r = await fetch('/api/tts?' + query.toString());
+        if (!r.ok) throw new Error('tts_' + r.status);
+        buffer = await r.arrayBuffer().then(data => ctx.decodeAudioData(data));
+        while (voiceBuffers.size >= 16) voiceBuffers.delete(voiceBuffers.keys().next().value);
+        voiceBuffers.set(key, buffer);
+      }
+      if (id !== voiceLoadId || !on) return false;
+      await resume();
+      if (id !== voiceLoadId || !on) return false;
+      stopVoice();
+      const source = ctx.createBufferSource();
+      const gain = ctx.createGain();
+      source.buffer = buffer;
+      gain.gain.value = 1;
+      source.connect(gain); gain.connect(ctx.destination);
+      voiceSrc = source;
+      source.onended = () => {
+        if (voiceSrc !== source) return;
+        voiceSrc = null;
+        if (typeof onended === 'function') onended();
+      };
+      source.start();
+      return true;
+    } catch (e) {
+      if (id === voiceLoadId) console.warn('โหลดเสียง MC ไม่สำเร็จ', e);
+      return false;
+    }
+  }
+
   return {
     unlock, resume, buffers,
     play(id){
@@ -482,6 +529,8 @@ const Snd = (() => {
       return startBGM(slot);
     },
     stopBGM,
+    stopVoice,
+    playVoice,
     ensureBGM,
     has: id => buffers.has(SLOT[id] || id),
     duck(value){
@@ -542,6 +591,7 @@ function stopMCVoice(){
   voiceSeq++;
   clearTimeout(voiceTimer);
   voiceTimer = null;
+  Snd.stopVoice();
   Speech.stop();
   Snd.duck(false);
   Snd.ensureBGM();
@@ -550,14 +600,26 @@ function speakMC(text, lang){
   const seq = ++voiceSeq;
   clearTimeout(voiceTimer);
   voiceTimer = null;
-  const spoken = Speech.say(text, lang);
-  if (!spoken) { Snd.duck(false); return; }
+  Snd.stopVoice();
+  Speech.stop();
   Snd.duck(true);
-  voiceTimer = setTimeout(() => {
+  Snd.playVoice(text, lang, () => {
     if (seq !== voiceSeq) return;
     Snd.duck(false);
     Snd.ensureBGM();
-  }, Math.min(12000, 1400 + String(text || '').length * 90));
+  }).then(started => {
+    if (seq !== voiceSeq || started) return;
+    // ถ้า proxy TTS ใช้งานไม่ได้ ให้ลอง browser voice ต่อเป็น fallback
+    Snd.duck(false);
+    const spoken = Speech.say(text, lang);
+    if (!spoken) return;
+    Snd.duck(true);
+    voiceTimer = setTimeout(() => {
+      if (seq !== voiceSeq) return;
+      Snd.duck(false);
+      Snd.ensureBGM();
+    }, Math.min(12000, 1400 + String(text || '').length * 90));
+  });
 }
 
 

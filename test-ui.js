@@ -84,6 +84,9 @@ for (const file of PAGES) {
     ok('ปิด MC แล้วหยุดเสียงพูดและคืนเพลงได้',
        script.includes('mc_stop') && script.includes('Speech.stop()') &&
        script.includes('Snd.duck(false)'));
+    ok('เสียง MC เข้า AudioContext เดียวกับเพลงผ่าน TTS proxy',
+       script.includes('Snd.playVoice') && script.includes("fetch('/api/tts?") &&
+       script.includes('Snd.stopVoice'));
     ok('เพลงมีระบบ resume และกู้คืนเมื่อหน้า Live กลับมาแสดง',
        script.includes('Snd.resume()') && script.includes('Snd.ensureBGM()') &&
        script.includes('source.loop = true'));

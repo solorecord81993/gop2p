@@ -43,6 +43,47 @@ const AI_DELAY_MS     = Number(process.env.AI_DELAY_MS ?? 600);   // หน่�
 const AI_RESULT_HOLD_MS = Number(process.env.AI_RESULT_HOLD_MS ?? 60_000);
 const neuralAI = new KataGoClient();
 
+// เสียง MC ใช้ไฟล์ MP3 จาก Google Translate TTS แล้วส่งกลับให้หน้า Live
+// เพื่อให้เสียงพูดเข้าช่อง AudioContext เดียวกับเพลง และถูกส่งออกไปพร้อมกัน
+const TTS_LANGS = Object.freeze({ th: 'th', en: 'en', ja: 'ja' });
+const TTS_MAX_CHARS = 180;
+const TTS_CACHE_MAX = 64;
+const ttsCache = new Map();
+
+async function getTTS(lang, text) {
+  const tl = TTS_LANGS[lang] || TTS_LANGS.th;
+  const phrase = String(text || '').trim().slice(0, TTS_MAX_CHARS);
+  if (!phrase) throw new Error('empty_tts_text');
+  const key = `${tl}:${phrase}`;
+  if (ttsCache.has(key)) return ttsCache.get(key);
+
+  const pending = (async () => {
+    const endpoint = new URL('https://translate.googleapis.com/translate_tts');
+    endpoint.searchParams.set('client', 'gtx');
+    endpoint.searchParams.set('sl', 'auto');
+    endpoint.searchParams.set('tl', tl);
+    endpoint.searchParams.set('dt', 't');
+    endpoint.searchParams.set('q', phrase);
+    const r = await fetch(endpoint, {
+      headers: { 'Accept': 'audio/mpeg', 'User-Agent': 'GoBattleLive/1.0' },
+    });
+    if (!r.ok) throw new Error(`tts_http_${r.status}`);
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (!buf.length) throw new Error('empty_tts_audio');
+    return buf;
+  })();
+  ttsCache.set(key, pending);
+  try {
+    const buf = await pending;
+    while (ttsCache.size > TTS_CACHE_MAX) ttsCache.delete(ttsCache.keys().next().value);
+    ttsCache.set(key, buf);
+    return buf;
+  } catch (e) {
+    ttsCache.delete(key);
+    throw e;
+  }
+}
+
 const RECONNECT_GRACE_MS = 60_000;
 const TICK_MS            = 250;
 
@@ -810,6 +851,28 @@ const isDirector = req => (req.headers['x-director-token'] || '') === DIRECTOR_T
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
+
+  /* ---------- เสียง MC เป็น MP3 เพื่อเข้า AudioContext ของหน้า Live ---------- */
+  if (url.pathname === '/api/tts' && req.method === 'GET') {
+    const lang = url.searchParams.get('lang') || 'th';
+    const text = (url.searchParams.get('text') || '').trim();
+    if (!TTS_LANGS[lang] || !text || text.length > TTS_MAX_CHARS) {
+      return json(res, 400, { error: 'invalid_tts_request' });
+    }
+    try {
+      const audio = await getTTS(lang, text);
+      res.writeHead(200, {
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': audio.length,
+        'Cache-Control': 'public, max-age=300',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      return res.end(audio);
+    } catch (e) {
+      console.warn('[tts]', e.message);
+      return json(res, 502, { error: 'tts_unavailable' });
+    }
+  }
 
   /* ---------- รายการไฟล์เสียงสำหรับโหลดล่วงหน้า (เปิดสาธารณะ) ---------- */
   if (url.pathname === '/api/manifest') return json(res, 200, SETTINGS.manifest());
