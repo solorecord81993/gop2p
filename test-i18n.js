@@ -69,6 +69,8 @@ for (const L of LANGS) {
 ok('คำพากย์สำรองของ MC ครบทุกภาษาและทุกหมวด', mcMissing.length === 0, mcMissing.join(', '));
 ok('คำพากย์ตอนเงียบมีให้เลือกอย่างน้อย 4 แบบต่อภาษา',
    LANGS.every(L => CANNED[L].idle.length >= 4));
+ok('คำพากย์ตอนสลับกระดานมีหลายรูปแบบต่อภาษา',
+   LANGS.every(L => CANNED[L].start.length >= 8));
 
 const mcGame = new GoGame({ size: 9, komi: 1.5 });
 const mcContext = contextFromRoom({
