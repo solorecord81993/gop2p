@@ -301,19 +301,27 @@ const Speech = (() => {
       } catch { enabled = false; return false; }
       return true;
     },
-    say(text, lang){
+    say(text, lang, onend){
       if (!enabled || !supported || !text) return false;
       try {
         resume();
         if (synth.speaking || synth.pending) synth.cancel();
         const u = new Utterance(String(text));
+        let finished = false;
+        const done = () => {
+          if (finished) return;
+          finished = true;
+          if (typeof onend === 'function') onend();
+        };
         u.lang = I.SPEECH_LANG[lang] || 'th-TH';
         const v = pick(lang); if (v) u.voice = v;
         u.rate = 1.05;
+        u.onend = done;
         u.onerror = e => {
           if (e.error !== 'interrupted' && e.error !== 'canceled') {
             console.warn('พูดไม่ได้', e.error || 'speech error');
           }
+          done();
         };
         synth.speak(u);
         resume();
@@ -376,8 +384,10 @@ fit();
 const Snd = (() => {
   let ctx = null, on = false;
   let bgmSrc = null, bgmGain = null, bgmSlot = null, wantedBGM = null;
-  let voiceSrc = null, voiceLoadId = 0;
+  let voiceSrc = null, voiceLoadId = 0, voiceEndTimer = null;
   let ducked = false;
+  const BGM_NORMAL_GAIN = .28;
+  const BGM_DUCK_GAIN = .14;
   const buffers = new Map();
   const voiceBuffers = new Map();
 
@@ -437,33 +447,45 @@ const Snd = (() => {
     const gain = ctx.createGain();
     source.buffer = buffers.get(slot);
     source.loop = true;
-    gain.gain.value = ducked ? .08 : .28;
+    gain.gain.value = ducked ? BGM_DUCK_GAIN : BGM_NORMAL_GAIN;
     source.connect(gain); gain.connect(ctx.destination);
     bgmSrc = source; bgmGain = gain; bgmSlot = slot;
     source.onended = () => {
       if (bgmSrc !== source) return;
       bgmSrc = null; bgmGain = null; bgmSlot = null;
-      if (wantedBGM === slot && on) setTimeout(() => startBGM(slot), 0);
+      if (wantedBGM === slot && on) setTimeout(() => ensureBGM(), 0);
     };
     try { source.start(); } catch { stopBGM(false); return false; }
     return true;
   }
 
   function ensureBGM(){
-    if (wantedBGM) startBGM(wantedBGM);
+    if (!wantedBGM || !on || !ctx) return false;
+    if (!bgmSrc || bgmSlot !== wantedBGM) return startBGM(wantedBGM);
+    if (bgmGain) bgmGain.gain.value = ducked ? BGM_DUCK_GAIN : BGM_NORMAL_GAIN;
+    return true;
+  }
+
+  function restoreBGM(){
+    ducked = false;
+    if (bgmGain) bgmGain.gain.value = BGM_NORMAL_GAIN;
+    return ensureBGM();
   }
 
   function stopVoice(){
     voiceLoadId++;
+    clearTimeout(voiceEndTimer);
+    voiceEndTimer = null;
     const old = voiceSrc;
     voiceSrc = null;
     if (old) { try { old.stop(); } catch {} }
   }
 
-  async function playVoice(text, lang, onended){
+  async function playVoice(text, lang, onended, onstart){
     if (!on || !ctx || !text) return false;
     const id = ++voiceLoadId;
     const phrase = String(text).trim().slice(0, 180);
+    if (!phrase) return false;
     const key = `${lang || 'th'}:${phrase}`;
     try {
       let buffer = voiceBuffers.get(key);
@@ -478,19 +500,31 @@ const Snd = (() => {
       if (id !== voiceLoadId || !on) return false;
       await resume();
       if (id !== voiceLoadId || !on) return false;
-      stopVoice();
       const source = ctx.createBufferSource();
       const gain = ctx.createGain();
       source.buffer = buffer;
       gain.gain.value = 1;
       source.connect(gain); gain.connect(ctx.destination);
       voiceSrc = source;
-      source.onended = () => {
+      const finish = () => {
         if (voiceSrc !== source) return;
+        clearTimeout(voiceEndTimer);
+        voiceEndTimer = null;
         voiceSrc = null;
         if (typeof onended === 'function') onended();
       };
+      source.onended = () => {
+        finish();
+      };
+      if (typeof onstart === 'function') onstart();
       source.start();
+      const durationMs = Number.isFinite(buffer.duration)
+        ? Math.max(100, buffer.duration * 1000)
+        : 10000;
+      // Some mobile browsers do not reliably fire AudioBufferSourceNode.onended
+      // after a tab has been backgrounded. The watchdog prevents BGM from
+      // staying ducked and lets the next queued sentence continue.
+      voiceEndTimer = setTimeout(finish, durationMs + 350);
       return true;
     } catch (e) {
       if (id === voiceLoadId) console.warn('โหลดเสียง MC ไม่สำเร็จ', e);
@@ -532,10 +566,11 @@ const Snd = (() => {
     stopVoice,
     playVoice,
     ensureBGM,
+    restoreBGM,
     has: id => buffers.has(SLOT[id] || id),
     duck(value){
       ducked = !!value;
-      if (bgmGain) bgmGain.gain.value = ducked ? .08 : .28;
+      if (bgmGain) bgmGain.gain.value = ducked ? BGM_DUCK_GAIN : BGM_NORMAL_GAIN;
     },   // หรี่เพลงตอน MC พูด และคืนเสียงเมื่อหยุดพูด
     get isOn(){ return on; },
   };
@@ -584,42 +619,88 @@ $('btnBoot').onclick = async () => {
  */
 let mcAutoEnabled = true;
 let voiceSeq = 0;
-let voiceTimer = null;
+const VOICE_GAP_MS = 900;
+const VOICE_PRIORITY = Object.freeze({ idle: 0, invite: 0, move: 1, byoyomi: 2, capture: 3, start: 4, cut: 4, end: 5, manual: 4 });
+let voiceGapTimer = null;
+let nativeVoiceTimer = null;
+let activeVoice = null;
+let pendingVoice = null;
 let lastMCText = '';
 let lastMCLang = LANG;
+
+function voicePriority(kind){ return VOICE_PRIORITY[kind] ?? 1; }
+
+// เก็บประโยคล่าสุดที่มีความหมายที่สุดไว้พูดต่อ โดยไม่ปล่อยให้ idle
+// เข้ามาทับ event สำคัญอย่างจับกินหรือจบเกม
+function queueLatestVoice(item){
+  if (!pendingVoice || voicePriority(item.kind) >= voicePriority(pendingVoice.kind) || item.kind === pendingVoice.kind) {
+    pendingVoice = item;
+  }
+}
+
+function schedulePendingVoice(){
+  if (voiceGapTimer || !pendingVoice) return;
+  voiceGapTimer = setTimeout(() => {
+    voiceGapTimer = null;
+    if (!mcAutoEnabled || activeVoice || !pendingVoice) return;
+    const next = pendingVoice;
+    pendingVoice = null;
+    startMCVoice(next);
+  }, VOICE_GAP_MS);
+}
+
+function finishMCVoice(seq){
+  if (!activeVoice || activeVoice.seq !== seq) return;
+  activeVoice = null;
+  clearTimeout(nativeVoiceTimer);
+  nativeVoiceTimer = null;
+  Snd.restoreBGM();
+  if (mcAutoEnabled && pendingVoice) schedulePendingVoice();
+  else pendingVoice = null;
+}
+
+function startMCVoice(item){
+  const seq = ++voiceSeq;
+  activeVoice = { ...item, seq };
+  Snd.playVoice(item.text, item.lang,
+    () => finishMCVoice(seq),
+    () => {
+      if (activeVoice?.seq === seq) Snd.duck(true);
+    }
+  ).then(started => {
+    if (!activeVoice || activeVoice.seq !== seq || started) return;
+    // ถ้า proxy TTS ใช้งานไม่ได้ ให้ลอง browser voice ต่อเป็น fallback
+    Snd.restoreBGM();
+    const spoken = Speech.say(item.text, item.lang, () => finishMCVoice(seq));
+    if (!spoken) { finishMCVoice(seq); return; }
+    Snd.duck(true);
+    nativeVoiceTimer = setTimeout(() => finishMCVoice(seq),
+      Math.min(12000, 1400 + String(item.text || '').length * 90));
+  });
+}
+
 function stopMCVoice(){
   voiceSeq++;
-  clearTimeout(voiceTimer);
-  voiceTimer = null;
+  clearTimeout(voiceGapTimer);
+  clearTimeout(nativeVoiceTimer);
+  voiceGapTimer = null;
+  nativeVoiceTimer = null;
+  activeVoice = null;
+  pendingVoice = null;
   Snd.stopVoice();
   Speech.stop();
-  Snd.duck(false);
-  Snd.ensureBGM();
+  Snd.restoreBGM();
 }
-function speakMC(text, lang){
-  const seq = ++voiceSeq;
-  clearTimeout(voiceTimer);
-  voiceTimer = null;
-  Snd.stopVoice();
-  Speech.stop();
-  Snd.duck(true);
-  Snd.playVoice(text, lang, () => {
-    if (seq !== voiceSeq) return;
-    Snd.duck(false);
-    Snd.ensureBGM();
-  }).then(started => {
-    if (seq !== voiceSeq || started) return;
-    // ถ้า proxy TTS ใช้งานไม่ได้ ให้ลอง browser voice ต่อเป็น fallback
-    Snd.duck(false);
-    const spoken = Speech.say(text, lang);
-    if (!spoken) return;
-    Snd.duck(true);
-    voiceTimer = setTimeout(() => {
-      if (seq !== voiceSeq) return;
-      Snd.duck(false);
-      Snd.ensureBGM();
-    }, Math.min(12000, 1400 + String(text || '').length * 90));
-  });
+
+function speakMC(text, lang, kind = 'idle'){
+  const phrase = String(text || '').trim();
+  if (!phrase) return;
+  const item = { text: phrase, lang: lang || LANG, kind: kind || 'idle' };
+  if (activeVoice || voiceGapTimer) {
+    queueLatestVoice(item);
+    return;
+  }
+  startMCVoice(item);
 }
 
 
@@ -652,7 +733,7 @@ function connect(){
       lastMCLang = m.lang || LANG;
       setMC(m.text);
       if (!program) $('idleMcText').textContent = m.text;
-      speakMC(m.text, m.lang || LANG);
+      speakMC(m.text, m.lang || LANG, m.kind || 'idle');
     }
     if (m.t === 'manifest') applyManifest(m);
     if (m.t === 'mc_info'){

@@ -83,13 +83,19 @@ for (const file of PAGES) {
        script.includes('let lastMCText =') && script.includes('lastMCText = String(m.text || \'\')'));
     ok('ปิด MC แล้วหยุดเสียงพูดและคืนเพลงได้',
        script.includes('mc_stop') && script.includes('Speech.stop()') &&
-       script.includes('Snd.duck(false)'));
+       script.includes('Snd.restoreBGM()'));
     ok('เสียง MC เข้า AudioContext เดียวกับเพลงผ่าน TTS proxy',
        script.includes('Snd.playVoice') && script.includes("fetch('/api/tts?") &&
        script.includes('Snd.stopVoice'));
+    ok('ประโยค MC ไม่ตัดกันเองและเว้นช่วงก่อนประโยคถัดไป',
+       script.includes('activeVoice') && script.includes('pendingVoice') &&
+       script.includes('VOICE_GAP_MS = 900') && !/function speakMC\([\s\S]*?Snd\.stopVoice\(\)/.test(script));
+    ok('คิว MC เลือก event ล่าสุดที่สำคัญกว่า idle',
+       script.includes('VOICE_PRIORITY') && script.includes('queueLatestVoice') &&
+       script.includes("kind || 'idle'"));
     ok('เพลงมีระบบ resume และกู้คืนเมื่อหน้า Live กลับมาแสดง',
        script.includes('Snd.resume()') && script.includes('Snd.ensureBGM()') &&
-       script.includes('source.loop = true'));
+       script.includes('source.loop = true') && script.includes('voiceEndTimer'));
     ok('จอว่างมี QR ลิงก์ และคำเชิญของ MC',
        declared.has('joinQr') && declared.has('joinLink') && declared.has('idleMcText'));
     ok('มีการ์ดสรุปคะแนนจริงหลังเกมจบ',

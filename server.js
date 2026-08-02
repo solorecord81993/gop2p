@@ -1301,7 +1301,7 @@ async function handle(ws, m) {
 
     case 'mc': {
       if (!directors.has(ws)) return sendErr(ws, 'no_permission');
-      const payload = { t: 'mc', text: String(m.text || '').slice(0, 200) };
+      const payload = { t: 'mc', text: String(m.text || '').slice(0, 200), kind: 'manual' };
       for (const v of liveViewers) send(v, payload);
       return;
     }
