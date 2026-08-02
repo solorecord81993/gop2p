@@ -75,6 +75,12 @@ for (const file of PAGES) {
     ok('มีระบบพูดออกเสียงข้อความ MC',
        script.includes('SpeechSynthesisUtterance') && script.includes('Speech.say'));
     ok('ปลดล็อกเสียงพูดตอนกดปุ่มเริ่ม', script.includes('Speech.unlock()'));
+    const bootSpeech = script.indexOf('const speechReady = Speech.unlock()');
+    const bootAudio = script.indexOf('const audioReady = Snd.unlock()');
+    ok('ปลดล็อก speech ก่อน await เสียงระบบ เพื่อรักษา user gesture บน iPhone',
+       bootSpeech >= 0 && bootAudio > bootSpeech && script.includes('speakMC(lastMCText || T(\'live.readyVoice\')'));
+    ok('เก็บและพูดซ้ำ MC ล่าสุดหลังปลดล็อกเสียง',
+       script.includes('let lastMCText =') && script.includes('lastMCText = String(m.text || \'\')'));
     ok('ปิด MC แล้วหยุดเสียงพูดและคืนเพลงได้',
        script.includes('mc_stop') && script.includes('Speech.stop()') &&
        script.includes('Snd.duck(false)'));
